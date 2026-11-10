@@ -8,8 +8,8 @@ import { usePagedList } from '../lib/usePagedList';
 
 const COUNTRY_OPTIONS = [
   { value: '', label: 'Азия' },
-  { value: WORLD, label: '🌍 Весь мир' },
-  ...COUNTRIES.map((c) => ({ value: c.code, label: `${c.flag} ${c.title}` })),
+  { value: WORLD, label: 'Весь мир' },
+  ...COUNTRIES.map((c) => ({ value: c.code, label: c.title })),
 ];
 
 export function Catalog() {
@@ -103,7 +103,6 @@ export function Catalog() {
           <NotConfigured />
         ) : list.error && list.items.length === 0 ? (
           <EmptyState
-            icon="📡"
             title="Не удалось загрузить"
             text={list.error}
             action={
@@ -115,12 +114,11 @@ export function Catalog() {
         ) : !list.loading && list.items.length === 0 ? (
           searching ? (
             <EmptyState
-              icon="🤷"
               title="Ничего не нашлось"
               text={`По запросу «${query}» ничего нет${country === WORLD ? '' : ' среди выбранных стран. Попробуйте «Весь мир»'}.`}
             />
           ) : (
-            <EmptyState icon="📺" title="Ничего не найдено" text="Попробуйте другую страну или жанр." />
+            <EmptyState title="Ничего не найдено" text="Попробуйте другую страну или жанр." />
           )
         ) : (
           <DramaGrid items={list.items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />

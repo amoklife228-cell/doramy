@@ -17,7 +17,7 @@ export function Poster({
   if (!url || failed) {
     return (
       <div className={`poster poster-empty ${className}`} aria-label={alt}>
-        🎞
+        <span>нет постера</span>
       </div>
     );
   }

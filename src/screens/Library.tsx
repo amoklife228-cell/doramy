@@ -6,7 +6,7 @@ import { Poster } from '../components/Poster';
 import { db, updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
 import {
-  countryOf,
+  countryLabel,
   formatRuntime,
   kindOf,
   LIBRARY_KINDS,
@@ -132,7 +132,7 @@ export function Library() {
                 setStatus('');
               }}
             >
-              {k.icon} {k.title}
+              {k.title}
               {byKind[k.id].length > 0 && <span className="chip-count">{byKind[k.id].length}</span>}
             </button>
           ))}
@@ -161,9 +161,9 @@ export function Library() {
 
       <div className="content">
         {section.length === 0 ? (
-          <EmptyState icon={kindInfo.icon} title={`${kindInfo.title}: пусто`} text={kindInfo.empty} />
+          <EmptyState title={`${kindInfo.title}: пусто`} text={kindInfo.empty} />
         ) : items.length === 0 ? (
-          <EmptyState icon="🔎" title="Ничего не найдено" text="Под текущий фильтр нет записей." />
+          <EmptyState title="Ничего не найдено" text="Под текущий фильтр нет записей." />
         ) : (
           <ul className="rows">
             {items.map((s) => (
@@ -177,7 +177,7 @@ export function Library() {
 }
 
 function LibraryRow({ item }: { item: SavedDrama }) {
-  const country = countryOf(item.originCountries);
+  const country = countryLabel(item.originCountries);
   const year = yearOf(item.firstAirDate);
   const st = STATUS_BY_ID.get(item.status)!;
   const progress = item.mediaType === 'tv' ? progressOf(item) : null;
@@ -194,14 +194,9 @@ function LibraryRow({ item }: { item: SavedDrama }) {
         <Poster path={item.posterPath} alt={item.title} size="w185" className="row-poster" />
         <div className="row-body">
           <div className="row-title">{item.title}</div>
-          <div className="row-sub">
-            {country?.flag ?? ''} {year ?? ''}
-            {extra ? ` · ${extra}` : ''}
-          </div>
+          <div className="row-sub">{[year, country, extra].filter(Boolean).join(' · ')}</div>
           <div className="row-meta">
-            <span className="status">
-              {st.icon} {st.title}
-            </span>
+            <span className="status">{st.title}</span>
             {item.userRating !== null && <span className="rating">★ {item.userRating}</span>}
           </div>
           {item.status === 'watching' && progress !== null && (

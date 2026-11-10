@@ -45,7 +45,7 @@ function SignedIn({ session }: { session: Session }) {
       </p>
       <div className="status-buttons">
         <button className="btn" onClick={() => void syncNow()} disabled={sync.status === 'syncing'}>
-          🔄 Синхронизировать
+          Синхронизировать
         </button>
         {confirm ? (
           <>

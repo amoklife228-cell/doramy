@@ -51,10 +51,10 @@ export function Settings() {
           </p>
           <div className="status-buttons">
             <button className="btn" onClick={() => void onExport()} disabled={count === 0}>
-              ⬇️ Экспорт в файл
+              Экспорт в файл
             </button>
             <button className="btn" onClick={() => fileInput.current?.click()}>
-              ⬆️ Импорт из файла
+              Импорт из файла
             </button>
             <input
               ref={fileInput}
@@ -70,9 +70,7 @@ export function Settings() {
           <h2>Установить на iPhone</h2>
           <ol className="steps">
             <li>Откройте этот сайт в Safari.</li>
-            <li>
-              Нажмите кнопку «Поделиться» <span aria-hidden>⎙</span> внизу экрана.
-            </li>
+            <li>Нажмите кнопку «Поделиться» внизу экрана (квадрат со стрелкой вверх).</li>
             <li>Выберите «На экран “Домой”» и нажмите «Добавить».</li>
           </ol>
           <p className="muted small">

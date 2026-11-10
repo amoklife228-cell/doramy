@@ -1,8 +1,8 @@
 export type MediaType = 'tv' | 'movie';
 
-export const MEDIA_TYPES: { id: MediaType; title: string; one: string; icon: string }[] = [
-  { id: 'tv', title: 'Сериалы', one: 'Сериал', icon: '📺' },
-  { id: 'movie', title: 'Фильмы', one: 'Фильм', icon: '🎬' },
+export const MEDIA_TYPES: { id: MediaType; title: string; one: string }[] = [
+  { id: 'tv', title: 'Сериалы', one: 'Сериал' },
+  { id: 'movie', title: 'Фильмы', one: 'Фильм' },
 ];
 
 export interface Drama {
@@ -63,17 +63,23 @@ export function itemKey(mediaType: MediaType, id: number): string {
 export interface Country {
   code: string;
   title: string;
-  flag: string;
 }
 
 export const COUNTRIES: Country[] = [
-  { code: 'KR', title: 'Корея', flag: '🇰🇷' },
-  { code: 'JP', title: 'Япония', flag: '🇯🇵' },
-  { code: 'CN', title: 'Китай', flag: '🇨🇳' },
-  { code: 'TW', title: 'Тайвань', flag: '🇹🇼' },
-  { code: 'TH', title: 'Таиланд', flag: '🇹🇭' },
-  { code: 'HK', title: 'Гонконг', flag: '🇭🇰' },
+  { code: 'KR', title: 'Корея' },
+  { code: 'JP', title: 'Япония' },
+  { code: 'CN', title: 'Китай' },
+  { code: 'TW', title: 'Тайвань' },
+  { code: 'TH', title: 'Таиланд' },
+  { code: 'HK', title: 'Гонконг' },
 ];
+
+/** Название страны для подписи под карточкой; для стран вне списка — код. */
+export function countryLabel(codes: string[]): string {
+  const known = countryOf(codes);
+  if (known) return known.title;
+  return codes[0] ?? '';
+}
 
 export const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
@@ -127,12 +133,12 @@ export const GENRES_BY_TYPE: Record<MediaType, { id: number; title: string }[]> 
 
 export const GENRE_BY_ID = new Map([...TV_GENRES, ...MOVIE_GENRES].map((g) => [g.id, g.title]));
 
-export const STATUSES: { id: WatchStatus; title: string; short: string; icon: string }[] = [
-  { id: 'planned', title: 'Хочу посмотреть', short: 'Хочу', icon: '🔖' },
-  { id: 'watching', title: 'Смотрю', short: 'Смотрю', icon: '▶️' },
-  { id: 'completed', title: 'Просмотрено', short: 'Готово', icon: '✅' },
-  { id: 'onHold', title: 'Отложено', short: 'Пауза', icon: '⏸️' },
-  { id: 'dropped', title: 'Брошено', short: 'Брошено', icon: '✖️' },
+export const STATUSES: { id: WatchStatus; title: string; short: string }[] = [
+  { id: 'planned', title: 'Хочу посмотреть', short: 'Хочу' },
+  { id: 'watching', title: 'Смотрю', short: 'Смотрю' },
+  { id: 'completed', title: 'Просмотрено', short: 'Готово' },
+  { id: 'onHold', title: 'Отложено', short: 'Пауза' },
+  { id: 'dropped', title: 'Брошено', short: 'Брошено' },
 ];
 
 export const STATUS_BY_ID = new Map(STATUSES.map((s) => [s.id, s]));
@@ -148,10 +154,10 @@ export const SORTS: { id: DiscoverSort; title: string }[] = [
 /** Раздел библиотеки: азиатские сериалы — дорамы, остальные сериалы отдельно, фильмы отдельно. */
 export type LibraryKind = 'dorama' | 'series' | 'movie';
 
-export const LIBRARY_KINDS: { id: LibraryKind; title: string; icon: string; empty: string }[] = [
-  { id: 'dorama', title: 'Дорамы', icon: '🌸', empty: 'Дорам пока нет. Откройте каталог сериалов и добавьте первую.' },
-  { id: 'series', title: 'Сериалы', icon: '📺', empty: 'Сериалов из других стран пока нет. В каталоге выберите «Весь мир».' },
-  { id: 'movie', title: 'Фильмы', icon: '🎬', empty: 'Фильмов пока нет. Переключите каталог на «Фильмы».' },
+export const LIBRARY_KINDS: { id: LibraryKind; title: string; empty: string }[] = [
+  { id: 'dorama', title: 'Дорамы', empty: 'Дорам пока нет. Откройте каталог сериалов и добавьте первую.' },
+  { id: 'series', title: 'Сериалы', empty: 'Сериалов из других стран пока нет. В каталоге выберите «Весь мир».' },
+  { id: 'movie', title: 'Фильмы', empty: 'Фильмов пока нет. Переключите каталог на «Фильмы».' },
 ];
 
 export function kindOf(item: { mediaType: MediaType; originCountries: string[]; kind?: LibraryKind }): LibraryKind {

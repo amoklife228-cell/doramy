@@ -1,10 +1,10 @@
 import { openDrama } from '../lib/router';
 import { useInfiniteScroll } from '../lib/hooks';
-import { countryOf, itemKey, yearOf, type Drama } from '../lib/types';
+import { countryLabel, itemKey, yearOf, type Drama } from '../lib/types';
 import { Poster } from './Poster';
 
 export function DramaCard({ drama, showType = false }: { drama: Drama; showType?: boolean }) {
-  const country = countryOf(drama.originCountries);
+  const country = countryLabel(drama.originCountries);
   const year = yearOf(drama.firstAirDate);
   return (
     <button className="card" onClick={() => openDrama(drama.mediaType, drama.id)}>
@@ -14,9 +14,7 @@ export function DramaCard({ drama, showType = false }: { drama: Drama; showType?
         {showType && drama.mediaType === 'movie' && <span className="badge badge-type">Фильм</span>}
       </div>
       <div className="card-title">{drama.title}</div>
-      <div className="card-sub">
-        {country?.flag} {year ?? ''}
-      </div>
+      <div className="card-sub">{[year, country].filter(Boolean).join(' · ')}</div>
     </button>
   );
 }
@@ -48,20 +46,9 @@ export function DramaGrid({
   );
 }
 
-export function EmptyState({
-  icon,
-  title,
-  text,
-  action,
-}: {
-  icon: string;
-  title: string;
-  text?: string;
-  action?: React.ReactNode;
-}) {
+export function EmptyState({ title, text, action }: { title: string; text?: string; action?: React.ReactNode }) {
   return (
     <div className="empty">
-      <div className="empty-icon">{icon}</div>
       <div className="empty-title">{title}</div>
       {text && <div className="empty-text">{text}</div>}
       {action && <div className="empty-action">{action}</div>}
@@ -72,7 +59,6 @@ export function EmptyState({
 export function NotConfigured() {
   return (
     <EmptyState
-      icon="🔑"
       title="Нужен ключ TMDB"
       text="Бесплатный ключ выдаётся на themoviedb.org. Вставьте его в «Настройках» один раз."
       action={

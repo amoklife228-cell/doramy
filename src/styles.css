@@ -369,10 +369,6 @@ input[type='search']::-webkit-search-cancel-button {
   color: var(--muted);
 }
 
-.empty-icon {
-  font-size: 44px;
-}
-
 .empty-title {
   color: var(--text);
   font-size: 18px;
@@ -821,6 +817,25 @@ code {
 }
 
 .tab-icon {
-  font-size: 20px;
-  line-height: 1;
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.tab-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.poster-empty span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 0 8px;
 }

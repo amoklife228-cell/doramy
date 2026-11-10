@@ -67,13 +67,12 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
         <button className="back" onClick={goBack} aria-label="Назад">
           ‹ Назад
         </button>
-        <span className="detail-kind">{isMovie ? '🎬 Фильм' : '📺 Сериал'}</span>
+        <span className="detail-kind">{isMovie ? 'Фильм' : 'Сериал'}</span>
       </header>
 
       {!drama ? (
         <div className="content">
           <div className="empty">
-            <div className="empty-icon">{error ? '📡' : '⏳'}</div>
             <div className="empty-title">{error ?? 'Загружаем…'}</div>
           </div>
         </div>
@@ -100,7 +99,7 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
               {drama.originalTitle && drama.originalTitle !== drama.title && (
                 <Row label="Оригинал" value={drama.originalTitle} />
               )}
-              {country && <Row label="Страна" value={`${country.flag} ${country.title}`} />}
+              {country && <Row label="Страна" value={country.title} />}
               {drama.firstAirDate && <Row label="Премьера" value={formatDate(drama.firstAirDate)} />}
               {airStatus && <Row label="Статус" value={airStatus} />}
               {isMovie && runtime && <Row label="Длительность" value={runtime} />}
@@ -131,9 +130,7 @@ function Hero({ drama }: { drama: Drama }) {
       <Poster path={drama.posterPath} alt={drama.title} size="w342" className="hero-poster" />
       <div className="hero-body">
         <h1 className="hero-title">{drama.title}</h1>
-        <div className="muted">
-          {country?.flag} {year ?? ''}
-        </div>
+        <div className="muted">{[year, country?.title].filter(Boolean).join(' · ')}</div>
         {drama.voteAverage > 0 && <div className="hero-rating">★ {drama.voteAverage.toFixed(1)}</div>}
         {drama.genreNames.length > 0 && <div className="muted small">{drama.genreNames.slice(0, 3).join(' · ')}</div>}
       </div>
@@ -147,7 +144,7 @@ function AddButtons({ drama }: { drama: Drama }) {
   if (!open) {
     return (
       <button className="btn btn-primary btn-wide" onClick={() => setOpen(true)}>
-        ＋ Добавить в библиотеку
+        Добавить в библиотеку
       </button>
     );
   }
@@ -157,7 +154,7 @@ function AddButtons({ drama }: { drama: Drama }) {
       <div className="status-buttons">
         {statuses.map((s) => (
           <button key={s.id} className="btn" onClick={() => void addToLibrary(drama, s.id)}>
-            {s.icon} {s.title}
+            {s.title}
           </button>
         ))}
       </div>
@@ -203,7 +200,7 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
         >
           {LIBRARY_KINDS.map((k) => (
             <option key={k.id} value={k.id}>
-              {k.icon} {k.title}
+              {k.title}
               {k.id === autoKind ? ' (авто)' : ''}
             </option>
           ))}
@@ -215,7 +212,7 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
         <select value={entry.status} onChange={(e) => setStatus(e.target.value as WatchStatus)}>
           {STATUSES.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.icon} {s.title}
+              {s.title}
             </option>
           ))}
         </select>
