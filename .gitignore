@@ -1,0 +1,7 @@
+node_modules
+dist
+dev-dist
+# иконки генерируются скриптом: npm run icons
+public/*.png
+.DS_Store
+*.log
