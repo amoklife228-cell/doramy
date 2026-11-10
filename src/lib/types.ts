@@ -178,6 +178,99 @@ export function autoKindOf(item: { mediaType: MediaType; originCountries: string
   return 'series';
 }
 
+/* ---------- фильтр каталога ---------- */
+
+export interface CatalogFilters {
+  sort: DiscoverSort;
+  genre: string; // id жанра или ''
+  year: string; // 'YYYY' или ''
+  country: string; // '' = Азия, WORLD, код страны
+  status: string; // см. STATUS_OPTIONS
+  category: string; // тип сериала (with_type) или ''
+  mine: '' | 'in' | 'out'; // в библиотеке / не в библиотеке
+  network: string; // id телеканала или ''
+}
+
+export const DEFAULT_FILTERS: CatalogFilters = {
+  sort: 'popular',
+  genre: '',
+  year: '',
+  country: '',
+  status: '',
+  category: '',
+  mine: '',
+  network: '',
+};
+
+export interface Option {
+  value: string;
+  label: string;
+}
+
+/** Статус выхода: для сериалов — with_status TMDB, для фильмов — по дате релиза. */
+export const STATUS_OPTIONS: Record<MediaType, Option[]> = {
+  tv: [
+    { value: '', label: 'Любой' },
+    { value: '0', label: 'Выходит' },
+    { value: '3', label: 'Завершён' },
+    { value: '1,2', label: 'Скоро' },
+  ],
+  movie: [
+    { value: '', label: 'Любой' },
+    { value: 'released', label: 'Уже вышел' },
+    { value: 'upcoming', label: 'Скоро в кино' },
+  ],
+};
+
+/** Категория (тип) сериала: with_type TMDB. Для фильмов не применяется. */
+export const CATEGORY_OPTIONS: Option[] = [
+  { value: '', label: 'Любая' },
+  { value: '4', label: 'Игровой сериал' },
+  { value: '2', label: 'Мини-сериал' },
+  { value: '3', label: 'Реалити' },
+  { value: '0', label: 'Документальный' },
+  { value: '5', label: 'Ток-шоу' },
+];
+
+export const MINE_OPTIONS: Option[] = [
+  { value: '', label: 'Все' },
+  { value: 'out', label: 'Ещё не в библиотеке' },
+  { value: 'in', label: 'Только из библиотеки' },
+];
+
+/** Телеканалы и платформы: id сетей TMDB (проверены по реальным сериалам). */
+export const NETWORK_OPTIONS: Option[] = [
+  { value: '', label: 'Любой' },
+  { value: '213', label: 'Netflix' },
+  { value: '866', label: 'tvN' },
+  { value: '885', label: 'JTBC' },
+  { value: '156', label: 'SBS' },
+  { value: '342', label: 'KBS2' },
+  { value: '97', label: 'MBC' },
+  { value: '627', label: 'OCN' },
+  { value: '5841', label: 'ENA' },
+  { value: '2739', label: 'Disney+' },
+  { value: '2552', label: 'Apple TV' },
+  { value: '1024', label: 'Prime Video' },
+  { value: '1330', label: 'iQiyi' },
+  { value: '1419', label: 'Youku' },
+  { value: '2007', label: 'Tencent Video' },
+  { value: '1974', label: 'GMM 25' },
+  { value: '6655', label: 'GMMTV' },
+  { value: '160', label: 'TBS (Япония)' },
+  { value: '57', label: 'Nippon TV' },
+  { value: '103', label: 'TV Asahi' },
+  { value: '98', label: 'TV Tokyo' },
+];
+
+export const YEAR_OPTIONS: Option[] = [
+  { value: '', label: 'Любой' },
+  ...Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => ({
+    value: y,
+    label: y,
+  })),
+];
+
 export function countryOf(codes: string[]): Country | undefined {
   return COUNTRIES.find((c) => codes.includes(c.code));
 }

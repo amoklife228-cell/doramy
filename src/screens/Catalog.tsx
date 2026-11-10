@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { countActive, FilterSheet } from '../components/FilterSheet';
 import { InstallHint } from '../components/InstallHint';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
@@ -11,12 +12,14 @@ import { backdropUrl, discover, randomPick, recommendations, remember, search } 
 import {
   COUNTRIES,
   countryLabel,
+  DEFAULT_FILTERS,
   GENRES_BY_TYPE,
   itemKey,
   MEDIA_TYPES,
   SORTS,
   WORLD,
   yearOf,
+  type CatalogFilters,
   type DiscoverSort,
   type Drama,
   type MediaType,
@@ -63,45 +66,64 @@ const MOODS: { title: string; genre: Record<MediaType, number>; sort?: DiscoverS
 export function Catalog() {
   const configured = useConfigured();
   const library = useLiveQuery(() => db.items.toArray(), []) ?? [];
+  const libraryKeys = useMemo(() => new Set(library.map((s) => s.key)), [library]);
 
   const [mediaType, setMediaType] = useState<MediaType>('tv');
-  const [country, setCountry] = useState('');
-  const [year, setYear] = useState('');
-  const [genre, setGenre] = useState<Record<MediaType, string>>({ tv: '', movie: '' });
-  const [sort, setSort] = useState<DiscoverSort>('popular');
+  const [filters, setFilters] = useState<Record<MediaType, CatalogFilters>>({ tv: DEFAULT_FILTERS, movie: DEFAULT_FILTERS });
   const [text, setText] = useState('');
   const [randomBusy, setRandomBusy] = useState(false);
   const [homeRefresh, setHomeRefresh] = useState(0);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const f = filters[mediaType];
+  const setF = (patch: Partial<CatalogFilters>) => setFilters({ ...filters, [mediaType]: { ...f, ...patch } });
 
   const query = useDebounced(text.trim(), 400);
   const searching = query.length >= 2;
-  const currentGenre = genre[mediaType];
-  const filtered = country !== '' || year !== '' || currentGenre !== '';
+  const activeCount = countActive(f);
+  // Сортировка сама по себе не включает режим результатов, остальные фильтры — включают.
+  const filtered = countActive({ ...f, sort: 'popular' }) > 0;
   const resultsMode = searching || filtered;
 
   const key = searching
-    ? `${configured}|s:${mediaType}|${country}|${query}`
-    : `${configured}|d:${mediaType}|${country}|${year}|${currentGenre}|${sort}`;
+    ? `${configured}|s:${mediaType}|${f.country}|${query}`
+    : `${configured}|d:${mediaType}|${JSON.stringify(f)}`;
 
   const fetcher = useCallback(
     (page: number, signal: AbortSignal) =>
       searching
-        ? search(mediaType, query, country, page, signal)
-        : discover({ mediaType, country, genre: currentGenre, year, sort, page }, signal),
-    [searching, mediaType, query, country, currentGenre, year, sort],
+        ? search(mediaType, query, f.country, page, signal)
+        : discover(
+            {
+              mediaType,
+              country: f.country,
+              genre: f.genre,
+              year: f.year,
+              sort: f.sort,
+              status: f.status,
+              category: f.category,
+              network: f.network,
+              page,
+            },
+            signal,
+          ),
+    [searching, mediaType, query, f],
   );
   const list = usePagedList(key, configured && resultsMode ? fetcher : null);
 
+  // «Мои сериалы» фильтруем на клиенте: TMDB не знает о библиотеке.
+  const shown = useMemo(() => {
+    if (!f.mine) return list.items;
+    return list.items.filter((d) => libraryKeys.has(itemKey(d.mediaType, d.id)) === (f.mine === 'in'));
+  }, [list.items, f.mine, libraryKeys]);
+
   const reset = () => {
-    setCountry('');
-    setYear('');
-    setGenre({ ...genre, [mediaType]: '' });
+    setF(DEFAULT_FILTERS);
     setText('');
   };
 
   const pickGenre = (id: number, s?: DiscoverSort) => {
-    setGenre({ ...genre, [mediaType]: String(id) });
-    if (s) setSort(s);
+    setF({ genre: String(id), ...(s ? { sort: s } : {}) });
     setText('');
   };
 
@@ -109,7 +131,7 @@ export function Catalog() {
     if (randomBusy) return;
     setRandomBusy(true);
     try {
-      const d = await randomPick(mediaType, country);
+      const d = await randomPick(mediaType, f.country);
       if (d) {
         remember([d]);
         openDrama(d.mediaType, d.id);
@@ -119,25 +141,24 @@ export function Catalog() {
     }
   };
 
-  const genreOptions = GENRES_BY_TYPE[mediaType];
   const chipOptions = [
     ...(resultsMode ? [{ value: '__reset', label: 'Сбросить' }] : []),
     ...YEARS.map((y) => ({ value: `y:${y}`, label: y })),
     { value: `c:${WORLD}`, label: 'Весь мир' },
     ...COUNTRIES.map((c) => ({ value: `c:${c.code}`, label: c.title })),
-    ...genreOptions.map((g) => ({ value: `g:${g.id}`, label: g.title })),
+    ...GENRES_BY_TYPE[mediaType].map((g) => ({ value: `g:${g.id}`, label: g.title })),
   ];
   const activeChips = new Set<string>([
-    ...(year ? [`y:${year}`] : []),
-    ...(country ? [`c:${country}`] : []),
-    ...(currentGenre ? [`g:${currentGenre}`] : []),
+    ...(f.year ? [`y:${f.year}`] : []),
+    ...(f.country ? [`c:${f.country}`] : []),
+    ...(f.genre ? [`g:${f.genre}`] : []),
   ]);
   const onChip = (v: string) => {
     if (v === '__reset') return reset();
     const [kind, val] = v.split(':');
-    if (kind === 'y') setYear(year === val ? '' : val);
-    if (kind === 'c') setCountry(country === val ? '' : val);
-    if (kind === 'g') setGenre({ ...genre, [mediaType]: currentGenre === val ? '' : val });
+    if (kind === 'y') setF({ year: f.year === val ? '' : val });
+    if (kind === 'c') setF({ country: f.country === val ? '' : val });
+    if (kind === 'g') setF({ genre: f.genre === val ? '' : val });
   };
 
   return (
@@ -151,22 +172,28 @@ export function Catalog() {
           </button>
         </div>
 
-        <div className="searchbox searchbox-icon">
-          <SearchIcon />
-          <input
-            type="search"
-            placeholder={mediaType === 'tv' ? 'Найти сериал по названию' : 'Найти фильм по названию'}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            autoCorrect="off"
-            autoCapitalize="off"
-            enterKeyHint="search"
-          />
-          {text && (
-            <button className="searchbox-clear" onClick={() => setText('')} aria-label="Очистить">
-              ✕
-            </button>
-          )}
+        <div className="search-row">
+          <div className="searchbox searchbox-icon">
+            <SearchIcon />
+            <input
+              type="search"
+              placeholder={mediaType === 'tv' ? 'Найти сериал по названию' : 'Найти фильм по названию'}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              autoCorrect="off"
+              autoCapitalize="off"
+              enterKeyHint="search"
+            />
+            {text && (
+              <button className="searchbox-clear" onClick={() => setText('')} aria-label="Очистить">
+                ✕
+              </button>
+            )}
+          </div>
+          <button className="filter-btn" data-active={activeCount > 0} onClick={() => setFilterOpen(true)} aria-label="Фильтр">
+            <SlidersIcon />
+            {activeCount > 0 && <span className="filter-badge">{activeCount}</span>}
+          </button>
         </div>
 
         <div className="segmented segmented-wide segmented-accent" role="tablist">
@@ -196,10 +223,8 @@ export function Catalog() {
           <>
             {!searching && (
               <div className="results-bar">
-                <span className="muted small">
-                  {list.items.length ? `Найдено ${list.hasMore ? 'много' : list.items.length}` : ''}
-                </span>
-                <select value={sort} onChange={(e) => setSort(e.target.value as DiscoverSort)} aria-label="Сортировка" className="sort-select">
+                <span className="muted small">{shown.length ? `Найдено ${list.hasMore ? 'много' : shown.length}` : ''}</span>
+                <select value={f.sort} onChange={(e) => setF({ sort: e.target.value as DiscoverSort })} aria-label="Сортировка" className="sort-select">
                   {SORTS.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title}
@@ -218,13 +243,18 @@ export function Catalog() {
                   </button>
                 }
               />
-            ) : !list.loading && list.items.length === 0 ? (
+            ) : !list.loading && shown.length === 0 ? (
               <EmptyState
                 title="Ничего не нашлось"
-                text={searching ? `По запросу «${query}» ничего нет${country === WORLD ? '' : '. Попробуйте «Весь мир»'}.` : 'Попробуйте другие фильтры.'}
+                text={searching ? `По запросу «${query}» ничего нет${f.country === WORLD ? '' : '. Попробуйте «Весь мир»'}.` : 'Попробуйте другие фильтры.'}
+                action={
+                  <button className="btn" onClick={reset}>
+                    Сбросить фильтры
+                  </button>
+                }
               />
             ) : (
-              <DramaGrid items={list.items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
+              <DramaGrid items={shown} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
             )}
           </>
         ) : (
@@ -234,6 +264,8 @@ export function Catalog() {
           </>
         )}
       </Refreshable>
+
+      <FilterSheet open={filterOpen} mediaType={mediaType} value={f} onApply={(nf) => setF(nf)} onClose={() => setFilterOpen(false)} />
     </>
   );
 }
@@ -456,6 +488,17 @@ function SearchIcon() {
     <svg className="search-icon" viewBox="0 0 24 24" aria-hidden>
       <circle cx="11" cy="11" r="6.5" />
       <path d="M16 16l4.5 4.5" />
+    </svg>
+  );
+}
+
+function SlidersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="9" cy="12" r="2" />
+      <circle cx="18" cy="17" r="2" />
     </svg>
   );
 }

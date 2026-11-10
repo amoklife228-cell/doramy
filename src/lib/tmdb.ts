@@ -186,6 +186,12 @@ export interface DiscoverParams {
   page: number;
   /** Год премьеры, '' = любой */
   year?: string;
+  /** Статус: tv — with_status ('0', '3', '1,2'), movie — 'released' | 'upcoming' */
+  status?: string;
+  /** Тип сериала (with_type), только tv */
+  category?: string;
+  /** Телеканал / платформа (with_networks), только tv */
+  network?: string;
 }
 
 const SORT_BY: Record<MediaType, Record<DiscoverSort, string>> = {
@@ -202,12 +208,23 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   if (p.country !== WORLD) params.with_origin_country = p.country || COUNTRIES.map((c) => c.code).join('|');
   if (p.genre) params.with_genres = p.genre;
   if (p.year) params[p.mediaType === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = p.year;
-  if (p.mediaType === 'tv') params.include_null_first_air_dates = 'false';
+  if (p.mediaType === 'tv') {
+    params.include_null_first_air_dates = 'false';
+    if (p.status) params.with_status = p.status.replace(',', '|');
+    if (p.category) params.with_type = p.category;
+    if (p.network) params.with_networks = p.network;
+  } else if (p.status === 'released') {
+    params['primary_release_date.lte'] = todayISO();
+  } else if (p.status === 'upcoming') {
+    params['primary_release_date.gte'] = todayISO();
+  }
+  const upcomingMovie = p.mediaType === 'movie' && p.status === 'upcoming';
   if (p.sort === 'topRated') params['vote_count.gte'] = p.mediaType === 'movie' ? '200' : '50';
-  if (p.sort === 'newest') {
+  if (p.sort === 'newest' && !upcomingMovie) {
     params[p.mediaType === 'tv' ? 'first_air_date.lte' : 'primary_release_date.lte'] = todayISO();
     params['vote_count.gte'] = '5';
   }
+  if (p.sort === 'newest' && upcomingMovie) params.sort_by = 'primary_release_date.asc';
 
   const r = await fetchJSON<ListResponse>(`/discover/${p.mediaType}`, params, signal);
   return { items: r.results.map((d) => toDrama(p.mediaType, d)), page: r.page, totalPages: Math.min(r.total_pages, 500) };
