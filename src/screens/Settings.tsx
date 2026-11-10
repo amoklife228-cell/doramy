@@ -3,8 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, exportLibrary, importLibrary } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { BUILTIN_KEY, clearCredential, getCredential, hasOwnCredential, saveCredential } from '../lib/tmdb';
+import { useSession } from '../lib/supabase';
+import { AccountSection } from './Account';
 
 export function Settings() {
+  const session = useSession();
   const configured = useConfigured();
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
   const [value, setValue] = useState('');
@@ -57,6 +60,8 @@ export function Settings() {
         <h1>Настройки</h1>
       </header>
       <div className="content settings">
+        <AccountSection session={session} />
+
         <section className="block">
           <h2>Ключ TMDB</h2>
           {configured && !hasOwnCredential() && BUILTIN_KEY ? (

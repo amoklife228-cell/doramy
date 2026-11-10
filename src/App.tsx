@@ -1,4 +1,6 @@
 import { useRoute, type Tab } from './lib/router';
+import { useSession } from './lib/supabase';
+import { useSyncLifecycle } from './lib/sync';
 import { itemKey } from './lib/types';
 import { TabBar } from './components/TabBar';
 import { Catalog } from './screens/Catalog';
@@ -8,6 +10,8 @@ import { Detail } from './screens/Detail';
 
 export default function App() {
   const route = useRoute();
+  const session = useSession();
+  useSyncLifecycle(!!session);
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>

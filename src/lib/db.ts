@@ -4,8 +4,15 @@ import { itemKey, type Drama, type MediaType, type SavedDrama, type WatchStatus 
 /** Запись первой версии базы: только сериалы, ключ — числовой tmdbId. */
 type LegacySaved = Omit<SavedDrama, 'key' | 'mediaType'>;
 
+interface OutboxRow {
+  key: string;
+  op: 'put' | 'delete';
+  ts: number;
+}
+
 class DoramyDB extends Dexie {
   items!: Table<SavedDrama, string>;
+  outbox!: Table<OutboxRow, string>;
 
   constructor() {
     super('doramy');
@@ -31,7 +38,18 @@ class DoramyDB extends Dexie {
       library: null,
       items: 'key, mediaType, status, isFavorite, addedAt, updatedAt',
     });
+    // v4: очередь изменений для синхронизации с аккаунтом.
+    this.version(4).stores({
+      items: 'key, mediaType, status, isFavorite, addedAt, updatedAt',
+      outbox: 'key',
+    });
   }
+}
+
+/** Подключается из sync.ts, чтобы db.ts не зависел от него (иначе циклический импорт). */
+let onChange: ((key: string, op: 'put' | 'delete') => void) | null = null;
+export function setChangeListener(fn: typeof onChange) {
+  onChange = fn;
 }
 
 export const db = new DoramyDB();
@@ -62,14 +80,17 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
     updatedAt: now,
   };
   await db.items.put(entry);
+  onChange?.(entry.key, 'put');
 }
 
 export async function updateEntry(key: string, patch: Partial<SavedDrama>): Promise<void> {
   await db.items.update(key, { ...patch, updatedAt: Date.now() });
+  onChange?.(key, 'put');
 }
 
 export async function removeEntry(key: string): Promise<void> {
   await db.items.delete(key);
+  onChange?.(key, 'delete');
 }
 
 /** Обновить метаданные из свежего ответа TMDB, не трогая пользовательские поля и updatedAt. */
@@ -134,5 +155,6 @@ export async function importLibrary(json: string): Promise<number> {
     });
   }
   await db.items.bulkPut(items);
+  for (const it of items) onChange?.(it.key, 'put');
   return items.length;
 }
