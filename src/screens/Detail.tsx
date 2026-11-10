@@ -22,7 +22,8 @@ import {
 export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) {
   const key = itemKey(mediaType, id);
   const configured = useConfigured();
-  const entry = useLiveQuery(() => db.items.get(key), [key]);
+  // undefined = ещё грузится, null = записи нет (get() сам по себе отдаёт undefined в обоих случаях).
+  const entry = useLiveQuery(async () => (await db.items.get(key)) ?? null, [key]);
   const [fresh, setFresh] = useState<Drama | null>(dramaCache.get(key) ?? null);
   const [error, setError] = useState<string | null>(null);
 
