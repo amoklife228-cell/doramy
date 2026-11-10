@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
-/** Шторка снизу: закрывается по фону, крестику и Escape. */
+/**
+ * Шторка снизу: закрывается по фону, Escape. Рисуется порталом в body: экраны-вкладки
+ * имеют position: fixed и создают свой слой, иначе панель вкладок перекрывала бы шторку.
+ */
 export function BottomSheet({
   open,
   onClose,
@@ -20,12 +24,13 @@ export function BottomSheet({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" aria-hidden />
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
