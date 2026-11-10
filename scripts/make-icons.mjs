@@ -48,8 +48,8 @@ function png(size, pixel) {
   ]);
 }
 
-const bg = [15, 15, 20];
-const accent = [230, 76, 153];
+const bg = [0, 0, 0];
+const accent = [229, 32, 46];
 const white = [255, 255, 255];
 
 function icon(u, v) {
