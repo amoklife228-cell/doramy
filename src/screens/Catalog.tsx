@@ -1,65 +1,158 @@
-import { useCallback, useState } from 'react';
-import { Chips } from '../components/Chips';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { Poster } from '../components/Poster';
+import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
-import { discover, search } from '../lib/tmdb';
-import { COUNTRIES, GENRES_BY_TYPE, MEDIA_TYPES, SORTS, WORLD, type DiscoverSort, type MediaType } from '../lib/types';
+import { openDrama } from '../lib/router';
+import { backdropUrl, discover, randomPick, recommendations, remember, search } from '../lib/tmdb';
+import {
+  COUNTRIES,
+  countryLabel,
+  GENRES_BY_TYPE,
+  itemKey,
+  MEDIA_TYPES,
+  SORTS,
+  WORLD,
+  yearOf,
+  type DiscoverSort,
+  type Drama,
+  type MediaType,
+  type SavedDrama,
+} from '../lib/types';
 import { usePagedList } from '../lib/usePagedList';
 
-const COUNTRY_OPTIONS = [
-  { value: '', label: 'Азия' },
-  { value: WORLD, label: 'Весь мир' },
-  ...COUNTRIES.map((c) => ({ value: c.code, label: c.title })),
+const THIS_YEAR = new Date().getFullYear();
+const YEARS = [THIS_YEAR, THIS_YEAR - 1, THIS_YEAR - 2].map(String);
+
+/** Карточки жанров на главной каталога: id жанра TMDB, подпись, цвета. */
+const GENRE_CARDS: Record<MediaType, { id: number; title: string; from: string; to: string }[]> = {
+  tv: [
+    { id: 9648, title: 'Детектив', from: '#3b2a6e', to: '#1a1535' },
+    { id: 10766, title: 'Мелодрама', from: '#7a2a52', to: '#2d1020' },
+    { id: 35, title: 'Комедия', from: '#8a5a12', to: '#2f1f08' },
+    { id: 10765, title: 'Фантастика', from: '#14506b', to: '#0a1e2a' },
+    { id: 10759, title: 'Боевик', from: '#7a2424', to: '#2b0d0d' },
+    { id: 18, title: 'Драма', from: '#2f5d3a', to: '#102015' },
+    { id: 10751, title: 'Семейный', from: '#5a4a1f', to: '#1f1a0a' },
+    { id: 16, title: 'Анимация', from: '#4a2a7a', to: '#1a0f2d' },
+  ],
+  movie: [
+    { id: 53, title: 'Триллер', from: '#3b2a6e', to: '#1a1535' },
+    { id: 10749, title: 'Мелодрама', from: '#7a2a52', to: '#2d1020' },
+    { id: 35, title: 'Комедия', from: '#8a5a12', to: '#2f1f08' },
+    { id: 878, title: 'Фантастика', from: '#14506b', to: '#0a1e2a' },
+    { id: 28, title: 'Боевик', from: '#7a2424', to: '#2b0d0d' },
+    { id: 18, title: 'Драма', from: '#2f5d3a', to: '#102015' },
+    { id: 27, title: 'Ужасы', from: '#1f1f1f', to: '#0a0a0a' },
+    { id: 16, title: 'Анимация', from: '#4a2a7a', to: '#1a0f2d' },
+  ],
+};
+
+/** Настроение → жанр. */
+const MOODS: { title: string; genre: Record<MediaType, number>; sort?: DiscoverSort }[] = [
+  { title: 'Посмеяться', genre: { tv: 35, movie: 35 } },
+  { title: 'Романтики', genre: { tv: 10766, movie: 10749 } },
+  { title: 'Пощекотать нервы', genre: { tv: 9648, movie: 53 } },
+  { title: 'Вдохновиться', genre: { tv: 10759, movie: 12 } },
+  { title: 'Погрустить', genre: { tv: 18, movie: 18 }, sort: 'topRated' },
 ];
 
 export function Catalog() {
   const configured = useConfigured();
+  const library = useLiveQuery(() => db.items.toArray(), []) ?? [];
+
   const [mediaType, setMediaType] = useState<MediaType>('tv');
   const [country, setCountry] = useState('');
+  const [year, setYear] = useState('');
   const [genre, setGenre] = useState<Record<MediaType, string>>({ tv: '', movie: '' });
   const [sort, setSort] = useState<DiscoverSort>('popular');
   const [text, setText] = useState('');
+  const [randomBusy, setRandomBusy] = useState(false);
 
   const query = useDebounced(text.trim(), 400);
   const searching = query.length >= 2;
   const currentGenre = genre[mediaType];
+  const filtered = country !== '' || year !== '' || currentGenre !== '';
+  const resultsMode = searching || filtered;
 
   const key = searching
     ? `${configured}|s:${mediaType}|${country}|${query}`
-    : `${configured}|d:${mediaType}|${country}|${currentGenre}|${sort}`;
+    : `${configured}|d:${mediaType}|${country}|${year}|${currentGenre}|${sort}`;
 
   const fetcher = useCallback(
     (page: number, signal: AbortSignal) =>
       searching
         ? search(mediaType, query, country, page, signal)
-        : discover({ mediaType, country, genre: currentGenre, sort, page }, signal),
-    [searching, mediaType, query, country, currentGenre, sort],
+        : discover({ mediaType, country, genre: currentGenre, year, sort, page }, signal),
+    [searching, mediaType, query, country, currentGenre, year, sort],
   );
-  const list = usePagedList(key, configured ? fetcher : null);
+  const list = usePagedList(key, configured && resultsMode ? fetcher : null);
+
+  const reset = () => {
+    setCountry('');
+    setYear('');
+    setGenre({ ...genre, [mediaType]: '' });
+    setText('');
+  };
+
+  const pickGenre = (id: number, s?: DiscoverSort) => {
+    setGenre({ ...genre, [mediaType]: String(id) });
+    if (s) setSort(s);
+    setText('');
+  };
+
+  const onRandom = async () => {
+    if (randomBusy) return;
+    setRandomBusy(true);
+    try {
+      const d = await randomPick(mediaType, country);
+      if (d) {
+        remember([d]);
+        openDrama(d.mediaType, d.id);
+      }
+    } finally {
+      setRandomBusy(false);
+    }
+  };
+
+  const genreOptions = GENRES_BY_TYPE[mediaType];
+  const chipOptions = [
+    ...(resultsMode ? [{ value: '__reset', label: 'Сбросить' }] : []),
+    ...YEARS.map((y) => ({ value: `y:${y}`, label: y })),
+    { value: `c:${WORLD}`, label: 'Весь мир' },
+    ...COUNTRIES.map((c) => ({ value: `c:${c.code}`, label: c.title })),
+    ...genreOptions.map((g) => ({ value: `g:${g.id}`, label: g.title })),
+  ];
+  const activeChips = new Set<string>([
+    ...(year ? [`y:${year}`] : []),
+    ...(country ? [`c:${country}`] : []),
+    ...(currentGenre ? [`g:${currentGenre}`] : []),
+  ]);
+  const onChip = (v: string) => {
+    if (v === '__reset') return reset();
+    const [kind, val] = v.split(':');
+    if (kind === 'y') setYear(year === val ? '' : val);
+    if (kind === 'c') setCountry(country === val ? '' : val);
+    if (kind === 'g') setGenre({ ...genre, [mediaType]: currentGenre === val ? '' : val });
+  };
 
   return (
     <>
       <header className="topbar">
-        <div className="topbar-row">
-          <h1>Дорамы</h1>
-          <div className="segmented" role="tablist">
-            {MEDIA_TYPES.map((m) => (
-              <button
-                key={m.id}
-                role="tab"
-                aria-selected={mediaType === m.id}
-                data-active={mediaType === m.id}
-                onClick={() => setMediaType(m.id)}
-              >
-                {m.title}
-              </button>
-            ))}
-          </div>
+        <div className="topbar-row cat-head">
+          <span className="profile-bar-spacer" />
+          <h1 className="cat-title">{mediaType === 'tv' ? 'Каталог сериалов' : 'Каталог фильмов'}</h1>
+          <button className="icon-btn" onClick={() => void onRandom()} aria-label="Случайный выбор" disabled={!configured || randomBusy}>
+            <DiceIcon />
+          </button>
         </div>
-        <div className="searchbox">
+
+        <div className="searchbox searchbox-icon">
+          <SearchIcon />
           <input
             type="search"
-            placeholder={mediaType === 'tv' ? 'Поиск сериала по названию' : 'Поиск фильма по названию'}
+            placeholder={mediaType === 'tv' ? 'Найти сериал по названию' : 'Найти фильм по названию'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoCorrect="off"
@@ -72,58 +165,280 @@ export function Catalog() {
             </button>
           )}
         </div>
-        {!searching && (
-          <div className="topbar-controls">
-            <select
-              value={currentGenre}
-              onChange={(e) => setGenre({ ...genre, [mediaType]: e.target.value })}
-              aria-label="Жанр"
-            >
-              <option value="">Все жанры</option>
-              {GENRES_BY_TYPE[mediaType].map((g) => (
-                <option key={g.id} value={String(g.id)}>
-                  {g.title}
-                </option>
-              ))}
-            </select>
-            <select value={sort} onChange={(e) => setSort(e.target.value as DiscoverSort)} aria-label="Сортировка">
-              {SORTS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <Chips value={country} onChange={setCountry} options={COUNTRY_OPTIONS} />
+
+        <div className="segmented segmented-wide segmented-accent" role="tablist">
+          {MEDIA_TYPES.map((m) => (
+            <button key={m.id} role="tab" aria-selected={mediaType === m.id} data-active={mediaType === m.id} onClick={() => setMediaType(m.id)}>
+              {m.title}
+            </button>
+          ))}
+        </div>
+
+        <MultiChips options={chipOptions} active={activeChips} onToggle={onChip} />
       </header>
 
       <div className="content">
         {!configured ? (
           <NotConfigured />
-        ) : list.error && list.items.length === 0 ? (
-          <EmptyState
-            title="Не удалось загрузить"
-            text={list.error}
-            action={
-              <button className="btn btn-primary" onClick={list.reload}>
-                Повторить
-              </button>
-            }
-          />
-        ) : !list.loading && list.items.length === 0 ? (
-          searching ? (
-            <EmptyState
-              title="Ничего не нашлось"
-              text={`По запросу «${query}» ничего нет${country === WORLD ? '' : ' среди выбранных стран. Попробуйте «Весь мир»'}.`}
-            />
-          ) : (
-            <EmptyState title="Ничего не найдено" text="Попробуйте другую страну или жанр." />
-          )
+        ) : resultsMode ? (
+          <>
+            {!searching && (
+              <div className="results-bar">
+                <span className="muted small">
+                  {list.items.length ? `Найдено ${list.hasMore ? 'много' : list.items.length}` : ''}
+                </span>
+                <select value={sort} onChange={(e) => setSort(e.target.value as DiscoverSort)} aria-label="Сортировка" className="sort-select">
+                  {SORTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {list.error && list.items.length === 0 ? (
+              <EmptyState
+                title="Не удалось загрузить"
+                text={list.error}
+                action={
+                  <button className="btn btn-primary" onClick={list.reload}>
+                    Повторить
+                  </button>
+                }
+              />
+            ) : !list.loading && list.items.length === 0 ? (
+              <EmptyState
+                title="Ничего не нашлось"
+                text={searching ? `По запросу «${query}» ничего нет${country === WORLD ? '' : '. Попробуйте «Весь мир»'}.` : 'Попробуйте другие фильтры.'}
+              />
+            ) : (
+              <DramaGrid items={list.items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
+            )}
+          </>
         ) : (
-          <DramaGrid items={list.items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
+          <CatalogHome mediaType={mediaType} library={library} onGenre={pickGenre} />
         )}
       </div>
     </>
+  );
+}
+
+/** Ряд чипов с несколькими активными одновременно. */
+function MultiChips({
+  options,
+  active,
+  onToggle,
+}: {
+  options: { value: string; label: string }[];
+  active: Set<string>;
+  onToggle: (v: string) => void;
+}) {
+  return (
+    <div className="chips">
+      {options.map((o) => (
+        <button key={o.value} className="chip" data-active={active.has(o.value)} data-reset={o.value === '__reset'} onClick={() => onToggle(o.value)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- главная каталога ---------- */
+
+const recCache = new Map<string, { basis: string; items: Drama[]; title: string }>();
+
+function CatalogHome({
+  mediaType,
+  library,
+  onGenre,
+}: {
+  mediaType: MediaType;
+  library: SavedDrama[];
+  onGenre: (id: number, sort?: DiscoverSort) => void;
+}) {
+  const configured = useConfigured();
+  // Опора для рекомендаций: избранное и просмотренное/смотрю этого типа, самые свежие.
+  const basisItems = useMemo(
+    () =>
+      library
+        .filter((s) => s.mediaType === mediaType && (s.isFavorite || s.status === 'completed' || s.status === 'watching'))
+        .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || b.updatedAt - a.updatedAt)
+        .slice(0, 4),
+    [library, mediaType],
+  );
+  const basis = basisItems.map((s) => s.tmdbId).join(',');
+  const libraryKeys = useMemo(() => new Set(library.map((s) => s.key)), [library]);
+
+  const [recs, setRecs] = useState<{ title: string; items: Drama[] } | null>(() => {
+    const c = recCache.get(mediaType);
+    return c && c.basis === basis ? { title: c.title, items: c.items } : null;
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!configured) return;
+    const cached = recCache.get(mediaType);
+    if (cached && cached.basis === basis) {
+      setRecs({ title: cached.title, items: cached.items });
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    (async () => {
+      let items: Drama[] = [];
+      let title = 'Рекомендации для тебя';
+      if (basisItems.length) {
+        const lists = await Promise.all(
+          basisItems.map((s) => recommendations(mediaType, s.tmdbId, controller.signal).catch(() => [] as Drama[])),
+        );
+        // Перемешиваем по кругу: по одному из каждого источника, чтобы не доминировал один сериал.
+        const seen = new Set<string>();
+        for (let i = 0; i < 20; i++) {
+          for (const l of lists) {
+            const d = l[i];
+            if (!d) continue;
+            const k = itemKey(d.mediaType, d.id);
+            if (seen.has(k) || libraryKeys.has(k)) continue;
+            seen.add(k);
+            items.push(d);
+          }
+        }
+        items = items.slice(0, 12);
+      }
+      if (items.length === 0) {
+        title = 'Популярное сейчас';
+        const r = await discover({ mediaType, country: '', genre: '', sort: 'topRated', page: 1 }, controller.signal).catch(() => null);
+        items = (r?.items ?? []).filter((d) => !libraryKeys.has(itemKey(d.mediaType, d.id))).slice(0, 12);
+      }
+      remember(items);
+      recCache.set(mediaType, { basis, items, title });
+      setRecs({ title, items });
+    })()
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+    // libraryKeys меняется при каждом изменении библиотеки; пересчёт нужен только при смене опоры.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configured, mediaType, basis]);
+
+  const moodBg = recs?.items.find((d) => d.backdropPath)?.backdropPath ?? null;
+
+  return (
+    <div className="home">
+      <div className="genre-cards">
+        {GENRE_CARDS[mediaType].map((g) => (
+          <button key={g.id} className="genre-card" style={{ background: `linear-gradient(160deg, ${g.from}, ${g.to})` }} onClick={() => onGenre(g.id)}>
+            <span>{g.title}</span>
+            <GenreArt id={g.id} />
+          </button>
+        ))}
+      </div>
+
+      <section className="pblock">
+        <h2 className="home-h2">{recs?.title ?? 'Рекомендации для тебя'}</h2>
+        {loading && !recs ? (
+          <div className="spinner">Подбираем…</div>
+        ) : recs && recs.items.length > 0 ? (
+          <div className="rec-strip">
+            {recs.items.map((d) => (
+              <RecCard key={itemKey(d.mediaType, d.id)} drama={d} />
+            ))}
+          </div>
+        ) : (
+          <p className="muted small">Пока нечего посоветовать.</p>
+        )}
+      </section>
+
+      <section className="moods" style={moodBg ? { backgroundImage: `url(${backdropUrl(moodBg)})` } : undefined}>
+        <div className="moods-inner">
+          {MOODS.map((m) => (
+            <button key={m.title} className="mood" onClick={() => onGenre(m.genre[mediaType], m.sort)}>
+              {m.title}
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RecCard({ drama }: { drama: Drama }) {
+  const year = yearOf(drama.firstAirDate);
+  const bd = backdropUrl(drama.backdropPath);
+  return (
+    <button className="rec" onClick={() => openDrama(drama.mediaType, drama.id)}>
+      <div className="rec-img">
+        {bd ? <img src={bd} alt={drama.title} loading="lazy" decoding="async" /> : <Poster path={drama.posterPath} alt={drama.title} size="w342" />}
+        {drama.voteAverage > 0 && <span className="rec-badge">★ {drama.voteAverage.toFixed(1)}</span>}
+      </div>
+      <div className="rec-title">{drama.title}</div>
+      <div className="rec-sub">{[year, countryLabel(drama.originCountries)].filter(Boolean).join(' · ')}</div>
+    </button>
+  );
+}
+
+/** Простая геометрическая иллюстрация жанра: без эмодзи и картинок. */
+function GenreArt({ id }: { id: number }) {
+  return (
+    <svg className="genre-art" viewBox="0 0 100 100" aria-hidden>
+      {id === 9648 || id === 53 ? (
+        <>
+          <circle cx="42" cy="42" r="22" />
+          <path d="M58 58l24 24" strokeWidth="10" />
+        </>
+      ) : id === 10766 || id === 10749 ? (
+        <path d="M50 84L22 56a16 16 0 0 1 28-16 16 16 0 0 1 28 16z" />
+      ) : id === 35 ? (
+        <>
+          <circle cx="50" cy="50" r="30" />
+          <path d="M34 58q16 16 32 0" strokeWidth="6" fill="none" />
+        </>
+      ) : id === 10765 || id === 878 ? (
+        <>
+          <circle cx="50" cy="50" r="18" />
+          <ellipse cx="50" cy="50" rx="42" ry="12" fill="none" strokeWidth="5" />
+        </>
+      ) : id === 10759 || id === 28 || id === 12 ? (
+        <path d="M20 80L70 30l10 10-50 50zM66 26l12-6-6 12z" />
+      ) : id === 18 ? (
+        <>
+          <path d="M22 30h56v40H22z" />
+          <path d="M22 70l14 12 8-12" />
+        </>
+      ) : id === 10751 ? (
+        <>
+          <circle cx="36" cy="40" r="12" />
+          <circle cx="64" cy="40" r="12" />
+          <path d="M20 84q30-30 60 0z" />
+        </>
+      ) : id === 27 ? (
+        <path d="M30 86V46a20 20 0 0 1 40 0v40l-8-8-8 8-8-8-8 8-8-8z" />
+      ) : (
+        <path d="M30 24l44 26-44 26z" />
+      )}
+    </svg>
+  );
+}
+
+function DiceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="15" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="15" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg className="search-icon" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </svg>
   );
 }

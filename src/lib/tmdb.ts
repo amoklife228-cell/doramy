@@ -183,6 +183,8 @@ export interface DiscoverParams {
   genre: string; // '' = все
   sort: DiscoverSort;
   page: number;
+  /** Год премьеры, '' = любой */
+  year?: string;
 }
 
 const SORT_BY: Record<MediaType, Record<DiscoverSort, string>> = {
@@ -198,6 +200,7 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   };
   if (p.country !== WORLD) params.with_origin_country = p.country || COUNTRIES.map((c) => c.code).join('|');
   if (p.genre) params.with_genres = p.genre;
+  if (p.year) params[p.mediaType === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = p.year;
   if (p.mediaType === 'tv') params.include_null_first_air_dates = 'false';
   if (p.sort === 'topRated') params['vote_count.gte'] = p.mediaType === 'movie' ? '200' : '50';
   if (p.sort === 'newest') {
@@ -242,6 +245,24 @@ export async function details(mediaType: MediaType, id: number, signal?: AbortSi
     episodeRuntime: d.episode_run_time?.[0] || d.last_episode_to_air?.runtime || undefined,
     airStatus: d.status,
   };
+}
+
+/** Похожие по мнению TMDB: первая страница рекомендаций к конкретному сериалу или фильму. */
+export async function recommendations(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Drama[]> {
+  const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: '1' }, signal);
+  return r.results.map((d) => toDrama(mediaType, d));
+}
+
+/** Случайная популярная запись: случайная страница из первых 15 и случайный элемент на ней. */
+export async function randomPick(mediaType: MediaType, country: string, signal?: AbortSignal): Promise<Drama | null> {
+  const page = 1 + Math.floor(Math.random() * 15);
+  const r = await discover({ mediaType, country, genre: '', sort: 'popular', page }, signal);
+  if (r.items.length === 0) return null;
+  return r.items[Math.floor(Math.random() * r.items.length)];
+}
+
+export function backdropUrl(path: string | null | undefined): string | null {
+  return path ? `https://image.tmdb.org/t/p/w780${path}` : null;
 }
 
 export function posterUrl(path: string | null | undefined, size: 'w185' | 'w342' | 'w500' = 'w342'): string | null {
