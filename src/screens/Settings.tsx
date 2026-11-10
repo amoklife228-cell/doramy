@@ -1,33 +1,14 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, exportLibrary, importLibrary } from '../lib/db';
-import { useConfigured } from '../lib/hooks';
-import { BUILTIN_KEY, clearCredential, getCredential, hasOwnCredential, saveCredential } from '../lib/tmdb';
 import { useSession } from '../lib/supabase';
 import { AccountSection } from './Account';
 
 export function Settings() {
   const session = useSession();
-  const configured = useConfigured();
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
-  const [value, setValue] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  const masked = (() => {
-    const c = getCredential();
-    return c.length > 8 ? `${c.slice(0, 4)}…${c.slice(-4)}` : c;
-  })();
-
-  const onSave = () => {
-    if (value.trim().length < 10) {
-      setMessage('Ключ слишком короткий. Скопируйте его целиком.');
-      return;
-    }
-    saveCredential(value);
-    setValue('');
-    setMessage('Ключ сохранён. Откройте «Каталог».');
-  };
 
   const onExport = async () => {
     const json = await exportLibrary();
@@ -63,48 +44,10 @@ export function Settings() {
         <AccountSection session={session} />
 
         <section className="block">
-          <h2>Ключ TMDB</h2>
-          {configured && !hasOwnCredential() && BUILTIN_KEY ? (
-            <p className="muted">Используется встроенный ключ, ничего настраивать не нужно. При желании можно указать свой.</p>
-          ) : configured ? (
-            <p className="muted">
-              Ваш ключ сохранён: <code>{masked}</code>
-            </p>
-          ) : (
-            <p className="muted">
-              Нужен, чтобы загружать каталог и поиск. Бесплатно: зарегистрируйтесь на themoviedb.org, откройте{' '}
-              <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
-                Settings → API
-              </a>{' '}
-              и скопируйте «API Key» или «API Read Access Token».
-            </p>
-          )}
-          <div className="keyform">
-            <input
-              type="text"
-              placeholder={hasOwnCredential() ? 'Вставьте новый ключ, чтобы заменить' : 'Вставьте свой ключ (необязательно)'}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-            />
-            <button className="btn btn-primary" onClick={onSave} disabled={!value.trim()}>
-              Сохранить
-            </button>
-          </div>
-          {hasOwnCredential() && (
-            <button className="btn btn-danger-text" onClick={() => { clearCredential(); setMessage('Свой ключ удалён.'); }}>
-              Удалить свой ключ
-            </button>
-          )}
-        </section>
-
-        <section className="block">
-          <h2>Библиотека</h2>
+          <h2>Резервная копия</h2>
           <p className="muted">
-            Записей: {count}. Данные хранятся только на этом устройстве. Сделайте резервную копию, чтобы не потерять
-            библиотеку при очистке Safari или смене телефона.
+            Записей в библиотеке: {count}. Экспорт сохраняет всё в файл, импорт восстанавливает из него.
+            {session ? '' : ' Без аккаунта данные живут только на этом устройстве, так что копию стоит делать.'}
           </p>
           <div className="status-buttons">
             <button className="btn" onClick={() => void onExport()} disabled={count === 0}>
@@ -140,7 +83,8 @@ export function Settings() {
         {message && <div className="toast">{message}</div>}
 
         <p className="muted small credit">
-          Данные о сериалах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не сертифицирован TMDB.
+          Данные о сериалах и фильмах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не
+          сертифицирован TMDB.
         </p>
       </div>
     </>
