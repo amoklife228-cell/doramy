@@ -44,6 +44,8 @@ export interface SavedDrama {
   genreNames: string[];
   episodeCount?: number;
   runtime?: number;
+  /** Раздел библиотеки, выбранный вручную. Нет — определяется автоматически (kindOf). */
+  kind?: LibraryKind;
   status: WatchStatus;
   /** 1..10 или null */
   userRating: number | null;
@@ -152,7 +154,13 @@ export const LIBRARY_KINDS: { id: LibraryKind; title: string; icon: string; empt
   { id: 'movie', title: 'Фильмы', icon: '🎬', empty: 'Фильмов пока нет. Переключите каталог на «Фильмы».' },
 ];
 
-export function kindOf(item: { mediaType: MediaType; originCountries: string[] }): LibraryKind {
+export function kindOf(item: { mediaType: MediaType; originCountries: string[]; kind?: LibraryKind }): LibraryKind {
+  if (item.kind) return item.kind;
+  return autoKindOf(item);
+}
+
+/** Раздел «по умолчанию», без учёта ручного выбора. */
+export function autoKindOf(item: { mediaType: MediaType; originCountries: string[] }): LibraryKind {
   if (item.mediaType === 'movie') return 'movie';
   // Страна неизвестна — считаем дорамой: каталог по умолчанию показывает Азию.
   if (item.originCountries.length === 0 || item.originCountries.some((c) => COUNTRY_CODES.has(c))) return 'dorama';

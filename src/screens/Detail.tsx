@@ -6,14 +6,18 @@ import { useConfigured } from '../lib/hooks';
 import { goBack } from '../lib/router';
 import { details, dramaCache } from '../lib/tmdb';
 import {
+  autoKindOf,
   countryOf,
   formatRuntime,
   itemKey,
+  kindOf,
+  LIBRARY_KINDS,
   localizedAirStatus,
   savedToDrama,
   STATUSES,
   yearOf,
   type Drama,
+  type LibraryKind,
   type MediaType,
   type SavedDrama,
   type WatchStatus,
@@ -180,9 +184,31 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
     void updateEntry(entry.key, patch);
   };
 
+  const autoKind = autoKindOf(entry);
+  const kindTitle = (k: LibraryKind) => LIBRARY_KINDS.find((x) => x.id === k)!;
+
   return (
     <section className="block editor">
       <h2>Моя библиотека</h2>
+
+      <label className="field">
+        <span>Раздел</span>
+        <select
+          value={kindOf(entry)}
+          onChange={(e) => {
+            const k = e.target.value as LibraryKind;
+            // Совпадает с автоматическим — не храним, чтобы авто-правило могло работать дальше.
+            void updateEntry(entry.key, { kind: k === autoKind ? undefined : k });
+          }}
+        >
+          {LIBRARY_KINDS.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.icon} {k.title}
+              {k.id === autoKind ? ' (авто)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="field">
         <span>Статус</span>
@@ -248,7 +274,9 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
         />
       </label>
 
-      <div className="muted small">Добавлено {formatDate(new Date(entry.addedAt).toISOString().slice(0, 10))}</div>
+      <div className="muted small">
+        Добавлено {formatDate(new Date(entry.addedAt).toISOString().slice(0, 10))} · в разделе «{kindTitle(kindOf(entry)).title}»
+      </div>
 
       {confirmRemove ? (
         <div className="status-buttons">

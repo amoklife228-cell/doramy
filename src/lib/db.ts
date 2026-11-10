@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import { itemKey, type Drama, type MediaType, type SavedDrama, type WatchStatus } from './types';
+import { itemKey, type Drama, type LibraryKind, type MediaType, type SavedDrama, type WatchStatus } from './types';
 
 /** Запись первой версии базы: только сериалы, ключ — числовой tmdbId. */
 type LegacySaved = Omit<SavedDrama, 'key' | 'mediaType'>;
@@ -120,6 +120,7 @@ export async function exportLibrary(): Promise<string> {
 
 const STATUSES: WatchStatus[] = ['planned', 'watching', 'completed', 'onHold', 'dropped'];
 const MEDIA: MediaType[] = ['tv', 'movie'];
+const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
 
 /** Импорт: записи с тем же ключом заменяются. Понимает и файлы первой версии (без mediaType). */
 export async function importLibrary(json: string): Promise<number> {
@@ -145,6 +146,7 @@ export async function importLibrary(json: string): Promise<number> {
       genreNames: raw.genreNames ?? [],
       episodeCount: raw.episodeCount,
       runtime: raw.runtime,
+      kind: KINDS.includes(raw.kind as LibraryKind) ? (raw.kind as LibraryKind) : undefined,
       status: STATUSES.includes(raw.status as WatchStatus) ? (raw.status as WatchStatus) : 'planned',
       userRating: typeof raw.userRating === 'number' ? raw.userRating : null,
       episodesWatched: raw.episodesWatched ?? 0,
