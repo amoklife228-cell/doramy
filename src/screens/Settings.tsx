@@ -6,7 +6,7 @@ import { BUILTIN_KEY, clearCredential, getCredential, hasOwnCredential, saveCred
 
 export function Settings() {
   const configured = useConfigured();
-  const count = useLiveQuery(() => db.library.count(), []) ?? 0;
+  const count = useLiveQuery(() => db.items.count(), []) ?? 0;
   const [value, setValue] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);

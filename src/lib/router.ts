@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
+import type { MediaType } from './types';
 
-export type Tab = 'catalog' | 'search' | 'library' | 'settings';
+export type Tab = 'catalog' | 'library' | 'settings';
 
 export interface Route {
   tab: Tab;
-  dramaId: number | null;
+  detail: { mediaType: MediaType; id: number } | null;
 }
 
-const TABS: Tab[] = ['catalog', 'search', 'library', 'settings'];
+const TABS: Tab[] = ['catalog', 'library', 'settings'];
 
 let lastTab: Tab = 'catalog';
 
 export function parseHash(hash: string): Route {
   const path = hash.replace(/^#/, '');
-  const detail = path.match(/^\/drama\/(\d+)/);
-  if (detail) return { tab: lastTab, dramaId: Number(detail[1]) };
+  const detail = path.match(/^\/(tv|movie|drama)\/(\d+)/);
+  if (detail) {
+    const mediaType: MediaType = detail[1] === 'movie' ? 'movie' : 'tv';
+    return { tab: lastTab, detail: { mediaType, id: Number(detail[2]) } };
+  }
   const seg = path.replace(/^\//, '').split('/')[0] as Tab;
   const tab = TABS.includes(seg) ? seg : 'catalog';
   lastTab = tab;
-  return { tab, dramaId: null };
+  return { tab, detail: null };
 }
 
 export function useRoute(): Route {
@@ -35,8 +39,8 @@ export function navigate(path: string) {
   location.hash = path;
 }
 
-export function openDrama(id: number) {
-  navigate(`/drama/${id}`);
+export function openDrama(mediaType: MediaType, id: number) {
+  navigate(`/${mediaType}/${id}`);
 }
 
 export function goBack() {

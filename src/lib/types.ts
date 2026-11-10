@@ -1,4 +1,12 @@
+export type MediaType = 'tv' | 'movie';
+
+export const MEDIA_TYPES: { id: MediaType; title: string; one: string; icon: string }[] = [
+  { id: 'tv', title: 'Сериалы', one: 'Сериал', icon: '📺' },
+  { id: 'movie', title: 'Фильмы', one: 'Фильм', icon: '🎬' },
+];
+
 export interface Drama {
+  mediaType: MediaType;
   id: number;
   title: string;
   originalTitle: string;
@@ -13,12 +21,17 @@ export interface Drama {
   genreNames: string[];
   episodeCount?: number;
   seasonCount?: number;
+  /** Длительность фильма в минутах */
+  runtime?: number;
   airStatus?: string;
 }
 
 export type WatchStatus = 'planned' | 'watching' | 'completed' | 'onHold' | 'dropped';
 
 export interface SavedDrama {
+  /** `${mediaType}:${tmdbId}` — у фильмов и сериалов TMDB id пересекаются. */
+  key: string;
+  mediaType: MediaType;
   tmdbId: number;
   title: string;
   originalTitle: string;
@@ -30,6 +43,7 @@ export interface SavedDrama {
   originCountries: string[];
   genreNames: string[];
   episodeCount?: number;
+  runtime?: number;
   status: WatchStatus;
   /** 1..10 или null */
   userRating: number | null;
@@ -38,6 +52,10 @@ export interface SavedDrama {
   isFavorite: boolean;
   addedAt: number;
   updatedAt: number;
+}
+
+export function itemKey(mediaType: MediaType, id: number): string {
+  return `${mediaType}:${id}`;
 }
 
 export interface Country {
@@ -57,7 +75,19 @@ export const COUNTRIES: Country[] = [
 
 export const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
-export const GENRES: { id: number; title: string }[] = [
+/** Специальное значение фильтра страны: без ограничения по стране. */
+export const WORLD = 'world';
+
+/** Язык оригинала → страна, когда TMDB не отдаёт origin_country (списки фильмов). */
+export const LANG_TO_COUNTRY: Record<string, string> = {
+  ko: 'KR',
+  ja: 'JP',
+  zh: 'CN',
+  th: 'TH',
+  cn: 'HK',
+};
+
+export const TV_GENRES: { id: number; title: string }[] = [
   { id: 18, title: 'Драма' },
   { id: 35, title: 'Комедия' },
   { id: 9648, title: 'Детектив' },
@@ -70,7 +100,30 @@ export const GENRES: { id: number; title: string }[] = [
   { id: 10764, title: 'Реалити' },
 ];
 
-export const GENRE_BY_ID = new Map(GENRES.map((g) => [g.id, g.title]));
+export const MOVIE_GENRES: { id: number; title: string }[] = [
+  { id: 18, title: 'Драма' },
+  { id: 10749, title: 'Мелодрама' },
+  { id: 35, title: 'Комедия' },
+  { id: 53, title: 'Триллер' },
+  { id: 9648, title: 'Детектив' },
+  { id: 80, title: 'Криминал' },
+  { id: 28, title: 'Боевик' },
+  { id: 12, title: 'Приключения' },
+  { id: 14, title: 'Фэнтези' },
+  { id: 878, title: 'Фантастика' },
+  { id: 27, title: 'Ужасы' },
+  { id: 36, title: 'История' },
+  { id: 10752, title: 'Военный' },
+  { id: 10751, title: 'Семейный' },
+  { id: 16, title: 'Анимация' },
+];
+
+export const GENRES_BY_TYPE: Record<MediaType, { id: number; title: string }[]> = {
+  tv: TV_GENRES,
+  movie: MOVIE_GENRES,
+};
+
+export const GENRE_BY_ID = new Map([...TV_GENRES, ...MOVIE_GENRES].map((g) => [g.id, g.title]));
 
 export const STATUSES: { id: WatchStatus; title: string; short: string; icon: string }[] = [
   { id: 'planned', title: 'Хочу посмотреть', short: 'Хочу', icon: '🔖' },
@@ -82,12 +135,12 @@ export const STATUSES: { id: WatchStatus; title: string; short: string; icon: st
 
 export const STATUS_BY_ID = new Map(STATUSES.map((s) => [s.id, s]));
 
-export type DiscoverSort = 'popularity.desc' | 'vote_average.desc' | 'first_air_date.desc';
+export type DiscoverSort = 'popular' | 'topRated' | 'newest';
 
 export const SORTS: { id: DiscoverSort; title: string }[] = [
-  { id: 'popularity.desc', title: 'По популярности' },
-  { id: 'vote_average.desc', title: 'По рейтингу' },
-  { id: 'first_air_date.desc', title: 'Сначала новые' },
+  { id: 'popular', title: 'По популярности' },
+  { id: 'topRated', title: 'По рейтингу' },
+  { id: 'newest', title: 'Сначала новые' },
 ];
 
 export function countryOf(codes: string[]): Country | undefined {
@@ -100,27 +153,41 @@ export function yearOf(date: string | null | undefined): number | null {
   return Number.isFinite(y) ? y : null;
 }
 
-export function localizedAirStatus(status: string | undefined): string | null {
+export function localizedAirStatus(status: string | undefined, mediaType: MediaType): string | null {
   switch (status) {
     case 'Returning Series':
       return 'Выходит';
     case 'Ended':
-      return 'Завершена';
+      return 'Завершён';
     case 'Canceled':
-      return 'Отменена';
+      return 'Отменён';
     case 'In Production':
       return 'В производстве';
+    case 'Post Production':
+      return 'Постпродакшн';
     case 'Planned':
-      return 'Запланирована';
+      return 'Запланирован';
+    case 'Rumored':
+      return 'Слухи';
     case 'Pilot':
       return 'Пилот';
+    case 'Released':
+      return mediaType === 'movie' ? 'Вышел' : 'Вышло';
     default:
       return status ?? null;
   }
 }
 
+export function formatRuntime(minutes: number | undefined): string | null {
+  if (!minutes || minutes <= 0) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h ? `${h} ч ${m ? `${m} мин` : ''}`.trim() : `${m} мин`;
+}
+
 export function savedToDrama(s: SavedDrama): Drama {
   return {
+    mediaType: s.mediaType,
     id: s.tmdbId,
     title: s.title,
     originalTitle: s.originalTitle,
@@ -133,5 +200,6 @@ export function savedToDrama(s: SavedDrama): Drama {
     originCountries: s.originCountries,
     genreNames: s.genreNames,
     episodeCount: s.episodeCount,
+    runtime: s.runtime,
   };
 }

@@ -2,7 +2,6 @@ import { navigate, type Tab } from '../lib/router';
 
 const TABS: { id: Tab; title: string; icon: string }[] = [
   { id: 'catalog', title: 'Каталог', icon: '🎬' },
-  { id: 'search', title: 'Поиск', icon: '🔍' },
   { id: 'library', title: 'Библиотека', icon: '📚' },
   { id: 'settings', title: 'Настройки', icon: '⚙️' },
 ];

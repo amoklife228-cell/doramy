@@ -5,9 +5,19 @@ import { EmptyState } from '../components/DramaGrid';
 import { Poster } from '../components/Poster';
 import { db, updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
-import { countryOf, STATUS_BY_ID, STATUSES, yearOf, type SavedDrama, type WatchStatus } from '../lib/types';
+import {
+  countryOf,
+  formatRuntime,
+  STATUS_BY_ID,
+  STATUSES,
+  yearOf,
+  type MediaType,
+  type SavedDrama,
+  type WatchStatus,
+} from '../lib/types';
 
 type SortId = 'addedNewest' | 'updated' | 'title' | 'userRating' | 'tmdbRating' | 'year' | 'progress';
+type TypeFilter = 'all' | MediaType;
 
 const SORTS: { id: SortId; title: string }[] = [
   { id: 'addedNewest', title: 'Недавно добавленные' },
@@ -19,17 +29,25 @@ const SORTS: { id: SortId; title: string }[] = [
   { id: 'progress', title: 'По прогрессу' },
 ];
 
+const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'Всё' },
+  { value: 'tv', label: '📺 Сериалы' },
+  { value: 'movie', label: '🎬 Фильмы' },
+];
+
 export function progressOf(s: SavedDrama): number | null {
+  if (s.mediaType === 'movie') return s.status === 'completed' ? 1 : null;
   if (!s.episodeCount || s.episodeCount <= 0) return null;
   return Math.min(1, s.episodesWatched / s.episodeCount);
 }
 
 export function applyQuery(
   items: SavedDrama[],
-  q: { status: WatchStatus | ''; favoritesOnly: boolean; search: string; sort: SortId },
+  q: { type: TypeFilter; status: WatchStatus | ''; favoritesOnly: boolean; search: string; sort: SortId },
 ): SavedDrama[] {
   const needle = q.search.trim().toLowerCase();
   const filtered = items.filter((s) => {
+    if (q.type !== 'all' && s.mediaType !== q.type) return false;
     if (q.status && s.status !== q.status) return false;
     if (q.favoritesOnly && !s.isFavorite) return false;
     if (needle && !s.title.toLowerCase().includes(needle) && !s.originalTitle.toLowerCase().includes(needle)) return false;
@@ -48,25 +66,29 @@ export function applyQuery(
 }
 
 export function Library() {
-  const all = useLiveQuery(() => db.library.toArray(), []) ?? [];
+  const all = useLiveQuery(() => db.items.toArray(), []) ?? [];
+  const [type, setType] = useState<TypeFilter>('all');
   const [status, setStatus] = useState<WatchStatus | ''>('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortId>('addedNewest');
 
   const items = useMemo(
-    () => applyQuery(all, { status, favoritesOnly, search, sort }),
-    [all, status, favoritesOnly, search, sort],
+    () => applyQuery(all, { type, status, favoritesOnly, search, sort }),
+    [all, type, status, favoritesOnly, search, sort],
   );
 
   const counts = useMemo(() => {
     const m = new Map<WatchStatus, number>();
-    for (const s of all) m.set(s.status, (m.get(s.status) ?? 0) + 1);
+    for (const s of all) if (type === 'all' || s.mediaType === type) m.set(s.status, (m.get(s.status) ?? 0) + 1);
     return m;
-  }, [all]);
+  }, [all, type]);
+
+  const total = type === 'all' ? all.length : all.filter((s) => s.mediaType === type).length;
+  const hasMovies = all.some((s) => s.mediaType === 'movie');
 
   const chipOptions = [
-    { value: '' as WatchStatus | '', label: 'Все', count: all.length },
+    { value: '' as WatchStatus | '', label: 'Все', count: total },
     ...STATUSES.filter((s) => (counts.get(s.id) ?? 0) > 0).map((s) => ({
       value: s.id as WatchStatus | '',
       label: s.short,
@@ -77,7 +99,24 @@ export function Library() {
   return (
     <>
       <header className="topbar">
-        <h1>Библиотека</h1>
+        <div className="topbar-row">
+          <h1>Библиотека</h1>
+          {hasMovies && (
+            <div className="segmented" role="tablist">
+              {TYPE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  role="tab"
+                  aria-selected={type === o.value}
+                  data-active={type === o.value}
+                  onClick={() => setType(o.value)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {all.length > 0 && (
           <>
             <div className="topbar-controls">
@@ -110,14 +149,14 @@ export function Library() {
           <EmptyState
             icon="📚"
             title="Библиотека пуста"
-            text="Откройте дораму в каталоге или поиске и нажмите «Добавить в библиотеку»."
+            text="Откройте сериал или фильм в каталоге и нажмите «Добавить в библиотеку»."
           />
         ) : items.length === 0 ? (
           <EmptyState icon="🔎" title="Ничего не найдено" text="Под текущий фильтр нет записей." />
         ) : (
           <ul className="rows">
             {items.map((s) => (
-              <LibraryRow key={s.tmdbId} item={s} />
+              <LibraryRow key={s.key} item={s} />
             ))}
           </ul>
         )}
@@ -130,17 +169,23 @@ function LibraryRow({ item }: { item: SavedDrama }) {
   const country = countryOf(item.originCountries);
   const year = yearOf(item.firstAirDate);
   const st = STATUS_BY_ID.get(item.status)!;
-  const progress = progressOf(item);
+  const progress = item.mediaType === 'tv' ? progressOf(item) : null;
+  const extra =
+    item.mediaType === 'movie'
+      ? [formatRuntime(item.runtime), 'фильм'].filter(Boolean).join(', ')
+      : item.episodeCount
+        ? `${item.episodeCount} эп.`
+        : '';
 
   return (
     <li className="row">
-      <button className="row-main" onClick={() => openDrama(item.tmdbId)}>
+      <button className="row-main" onClick={() => openDrama(item.mediaType, item.tmdbId)}>
         <Poster path={item.posterPath} alt={item.title} size="w185" className="row-poster" />
         <div className="row-body">
           <div className="row-title">{item.title}</div>
           <div className="row-sub">
             {country?.flag} {year ?? ''}
-            {item.episodeCount ? ` · ${item.episodeCount} эп.` : ''}
+            {extra ? ` · ${extra}` : ''}
           </div>
           <div className="row-meta">
             <span className="status">
@@ -162,7 +207,7 @@ function LibraryRow({ item }: { item: SavedDrama }) {
         className="row-fav"
         data-active={item.isFavorite}
         aria-label={item.isFavorite ? 'Убрать из избранного' : 'В избранное'}
-        onClick={() => void updateEntry(item.tmdbId, { isFavorite: !item.isFavorite })}
+        onClick={() => void updateEntry(item.key, { isFavorite: !item.isFavorite })}
       >
         {item.isFavorite ? '♥' : '♡'}
       </button>

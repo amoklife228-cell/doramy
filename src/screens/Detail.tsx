@@ -7,27 +7,31 @@ import { goBack } from '../lib/router';
 import { details, dramaCache } from '../lib/tmdb';
 import {
   countryOf,
+  formatRuntime,
+  itemKey,
   localizedAirStatus,
   savedToDrama,
   STATUSES,
   yearOf,
   type Drama,
+  type MediaType,
   type SavedDrama,
   type WatchStatus,
 } from '../lib/types';
 
-export function Detail({ id }: { id: number }) {
+export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) {
+  const key = itemKey(mediaType, id);
   const configured = useConfigured();
-  const entry = useLiveQuery(() => db.library.get(id), [id]);
-  const [fresh, setFresh] = useState<Drama | null>(dramaCache.get(id) ?? null);
+  const entry = useLiveQuery(() => db.items.get(key), [key]);
+  const [fresh, setFresh] = useState<Drama | null>(dramaCache.get(key) ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!configured) return;
     const controller = new AbortController();
-    details(id, controller.signal)
+    details(mediaType, id, controller.signal)
       .then((d) => {
-        dramaCache.set(id, d);
+        dramaCache.set(key, d);
         setFresh(d);
         void refreshMetadata(d);
       })
@@ -35,18 +39,22 @@ export function Detail({ id }: { id: number }) {
         if (e.name !== 'AbortError') setError(e.message);
       });
     return () => controller.abort();
-  }, [id, configured]);
+  }, [mediaType, id, key, configured]);
 
   // undefined = Dexie ещё не ответил; не показываем кнопку «Добавить», пока не знаем.
   const loadingEntry = entry === undefined;
   const drama: Drama | null = fresh ?? (entry ? savedToDrama(entry) : null);
 
-  // Закрытие по Escape на десктопе.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goBack();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const isMovie = mediaType === 'movie';
+  const country = drama ? countryOf(drama.originCountries) : undefined;
+  const airStatus = drama ? localizedAirStatus(drama.airStatus, mediaType) : null;
+  const runtime = drama ? formatRuntime(drama.runtime) : null;
 
   return (
     <div className="detail" role="dialog" aria-modal="true">
@@ -54,6 +62,7 @@ export function Detail({ id }: { id: number }) {
         <button className="back" onClick={goBack} aria-label="Назад">
           ‹ Назад
         </button>
+        <span className="detail-kind">{isMovie ? '🎬 Фильм' : '📺 Сериал'}</span>
       </header>
 
       {!drama ? (
@@ -68,7 +77,7 @@ export function Detail({ id }: { id: number }) {
           <Hero drama={drama} />
 
           {loadingEntry ? null : entry ? (
-            <EntryEditor entry={entry} episodeCount={drama.episodeCount ?? entry.episodeCount} />
+            <EntryEditor entry={entry} episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)} />
           ) : (
             <AddButtons drama={drama} />
           )}
@@ -86,12 +95,11 @@ export function Detail({ id }: { id: number }) {
               {drama.originalTitle && drama.originalTitle !== drama.title && (
                 <Row label="Оригинал" value={drama.originalTitle} />
               )}
-              {countryOf(drama.originCountries) && (
-                <Row label="Страна" value={`${countryOf(drama.originCountries)!.flag} ${countryOf(drama.originCountries)!.title}`} />
-              )}
+              {country && <Row label="Страна" value={`${country.flag} ${country.title}`} />}
               {drama.firstAirDate && <Row label="Премьера" value={formatDate(drama.firstAirDate)} />}
-              {localizedAirStatus(drama.airStatus) && <Row label="Статус" value={localizedAirStatus(drama.airStatus)!} />}
-              {drama.episodeCount && (
+              {airStatus && <Row label="Статус" value={airStatus} />}
+              {isMovie && runtime && <Row label="Длительность" value={runtime} />}
+              {!isMovie && drama.episodeCount && (
                 <Row
                   label="Серии"
                   value={drama.seasonCount ? `${drama.episodeCount} эп., сезонов: ${drama.seasonCount}` : `${drama.episodeCount} эп.`}
@@ -130,6 +138,7 @@ function Hero({ drama }: { drama: Drama }) {
 
 function AddButtons({ drama }: { drama: Drama }) {
   const [open, setOpen] = useState(false);
+  const statuses = drama.mediaType === 'movie' ? STATUSES.filter((s) => s.id !== 'watching' && s.id !== 'onHold') : STATUSES;
   if (!open) {
     return (
       <button className="btn btn-primary btn-wide" onClick={() => setOpen(true)}>
@@ -141,7 +150,7 @@ function AddButtons({ drama }: { drama: Drama }) {
     <div className="block">
       <h2>Со статусом</h2>
       <div className="status-buttons">
-        {STATUSES.map((s) => (
+        {statuses.map((s) => (
           <button key={s.id} className="btn" onClick={() => void addToLibrary(drama, s.id)}>
             {s.icon} {s.title}
           </button>
@@ -154,11 +163,12 @@ function AddButtons({ drama }: { drama: Drama }) {
 function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount: number | undefined }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [notes, setNotes] = useState(entry.notes);
+  const isMovie = entry.mediaType === 'movie';
 
   const setStatus = (status: WatchStatus) => {
     const patch: Partial<SavedDrama> = { status };
     if (status === 'completed' && episodeCount) patch.episodesWatched = episodeCount;
-    void updateEntry(entry.tmdbId, patch);
+    void updateEntry(entry.key, patch);
   };
 
   const setEpisodes = (n: number) => {
@@ -166,7 +176,7 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
     const value = Math.max(0, Math.min(max, n));
     const patch: Partial<SavedDrama> = { episodesWatched: value };
     if (episodeCount && value >= episodeCount && entry.status === 'watching') patch.status = 'completed';
-    void updateEntry(entry.tmdbId, patch);
+    void updateEntry(entry.key, patch);
   };
 
   return (
@@ -189,31 +199,33 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
         <input
           type="checkbox"
           checked={entry.isFavorite}
-          onChange={(e) => void updateEntry(entry.tmdbId, { isFavorite: e.target.checked })}
+          onChange={(e) => void updateEntry(entry.key, { isFavorite: e.target.checked })}
         />
       </label>
 
-      <div className="field">
-        <span>Просмотрено серий</span>
-        <div className="stepper">
-          <button onClick={() => setEpisodes(entry.episodesWatched - 1)} aria-label="Минус серия">
-            −
-          </button>
-          <span className="stepper-value">
-            {entry.episodesWatched}
-            {episodeCount ? ` / ${episodeCount}` : ''}
-          </span>
-          <button onClick={() => setEpisodes(entry.episodesWatched + 1)} aria-label="Плюс серия">
-            +
-          </button>
+      {!isMovie && (
+        <div className="field">
+          <span>Просмотрено серий</span>
+          <div className="stepper">
+            <button onClick={() => setEpisodes(entry.episodesWatched - 1)} aria-label="Минус серия">
+              −
+            </button>
+            <span className="stepper-value">
+              {entry.episodesWatched}
+              {episodeCount ? ` / ${episodeCount}` : ''}
+            </span>
+            <button onClick={() => setEpisodes(entry.episodesWatched + 1)} aria-label="Плюс серия">
+              +
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <label className="field">
         <span>Моя оценка</span>
         <select
           value={entry.userRating ?? ''}
-          onChange={(e) => void updateEntry(entry.tmdbId, { userRating: e.target.value ? Number(e.target.value) : null })}
+          onChange={(e) => void updateEntry(entry.key, { userRating: e.target.value ? Number(e.target.value) : null })}
         >
           <option value="">Без оценки</option>
           {Array.from({ length: 10 }, (_, i) => 10 - i).map((v) => (
@@ -231,7 +243,7 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
           placeholder="Впечатления, где остановились…"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => notes !== entry.notes && void updateEntry(entry.tmdbId, { notes })}
+          onBlur={() => notes !== entry.notes && void updateEntry(entry.key, { notes })}
         />
       </label>
 
@@ -239,7 +251,7 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
 
       {confirmRemove ? (
         <div className="status-buttons">
-          <button className="btn btn-danger" onClick={() => void removeEntry(entry.tmdbId)}>
+          <button className="btn btn-danger" onClick={() => void removeEntry(entry.key)}>
             Да, удалить
           </button>
           <button className="btn" onClick={() => setConfirmRemove(false)}>

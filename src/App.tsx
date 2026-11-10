@@ -1,7 +1,7 @@
 import { useRoute, type Tab } from './lib/router';
+import { itemKey } from './lib/types';
 import { TabBar } from './components/TabBar';
 import { Catalog } from './screens/Catalog';
-import { Search } from './screens/Search';
 import { Library } from './screens/Library';
 import { Settings } from './screens/Settings';
 import { Detail } from './screens/Detail';
@@ -18,11 +18,16 @@ export default function App() {
   return (
     <div className="app">
       {screen('catalog', <Catalog />)}
-      {screen('search', <Search />)}
       {screen('library', <Library />)}
       {screen('settings', <Settings />)}
-      {route.dramaId !== null && <Detail key={route.dramaId} id={route.dramaId} />}
-      <TabBar active={route.tab} hidden={route.dramaId !== null} />
+      {route.detail && (
+        <Detail
+          key={itemKey(route.detail.mediaType, route.detail.id)}
+          mediaType={route.detail.mediaType}
+          id={route.detail.id}
+        />
+      )}
+      <TabBar active={route.tab} hidden={route.detail !== null} />
     </div>
   );
 }

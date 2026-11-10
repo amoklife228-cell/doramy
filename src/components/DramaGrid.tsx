@@ -1,16 +1,17 @@
 import { openDrama } from '../lib/router';
 import { useInfiniteScroll } from '../lib/hooks';
-import { countryOf, yearOf, type Drama } from '../lib/types';
+import { countryOf, itemKey, yearOf, type Drama } from '../lib/types';
 import { Poster } from './Poster';
 
-export function DramaCard({ drama }: { drama: Drama }) {
+export function DramaCard({ drama, showType = false }: { drama: Drama; showType?: boolean }) {
   const country = countryOf(drama.originCountries);
   const year = yearOf(drama.firstAirDate);
   return (
-    <button className="card" onClick={() => openDrama(drama.id)}>
+    <button className="card" onClick={() => openDrama(drama.mediaType, drama.id)}>
       <div className="card-poster">
         <Poster path={drama.posterPath} alt={drama.title} />
         {drama.voteAverage > 0 && <span className="badge">★ {drama.voteAverage.toFixed(1)}</span>}
+        {showType && drama.mediaType === 'movie' && <span className="badge badge-type">Фильм</span>}
       </div>
       <div className="card-title">{drama.title}</div>
       <div className="card-sub">
@@ -25,18 +26,20 @@ export function DramaGrid({
   loading,
   hasMore,
   onLoadMore,
+  showType = false,
 }: {
   items: Drama[];
   loading: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
+  showType?: boolean;
 }) {
   const sentinel = useInfiniteScroll(onLoadMore, hasMore && !loading);
   return (
     <>
       <div className="grid">
         {items.map((d) => (
-          <DramaCard key={d.id} drama={d} />
+          <DramaCard key={itemKey(d.mediaType, d.id)} drama={d} showType={showType} />
         ))}
       </div>
       <div ref={sentinel} className="sentinel" />

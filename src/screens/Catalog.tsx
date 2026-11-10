@@ -1,43 +1,65 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Chips } from '../components/Chips';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
 import { useConfigured, useDebounced } from '../lib/hooks';
 import { discover, search } from '../lib/tmdb';
-import { COUNTRIES, GENRES, SORTS, type DiscoverSort } from '../lib/types';
+import { COUNTRIES, GENRES_BY_TYPE, MEDIA_TYPES, SORTS, WORLD, type DiscoverSort, type MediaType } from '../lib/types';
 import { usePagedList } from '../lib/usePagedList';
+
+const COUNTRY_OPTIONS = [
+  { value: '', label: 'Азия' },
+  { value: WORLD, label: '🌍 Весь мир' },
+  ...COUNTRIES.map((c) => ({ value: c.code, label: `${c.flag} ${c.title}` })),
+];
 
 export function Catalog() {
   const configured = useConfigured();
+  const [mediaType, setMediaType] = useState<MediaType>('tv');
   const [country, setCountry] = useState('');
-  const [genre, setGenre] = useState('');
-  const [sort, setSort] = useState<DiscoverSort>('popularity.desc');
+  const [genre, setGenre] = useState<Record<MediaType, string>>({ tv: '', movie: '' });
+  const [sort, setSort] = useState<DiscoverSort>('popular');
   const [text, setText] = useState('');
 
   const query = useDebounced(text.trim(), 400);
   const searching = query.length >= 2;
+  const currentGenre = genre[mediaType];
 
-  const key = searching ? `${configured}|s:${query}` : `${configured}|d:${country}|${genre}|${sort}`;
+  const key = searching
+    ? `${configured}|s:${mediaType}|${country}|${query}`
+    : `${configured}|d:${mediaType}|${country}|${currentGenre}|${sort}`;
+
   const fetcher = useCallback(
     (page: number, signal: AbortSignal) =>
-      searching ? search(query, page, signal) : discover({ country, genre, sort, page }, signal),
-    [searching, query, country, genre, sort],
+      searching
+        ? search(mediaType, query, country, page, signal)
+        : discover({ mediaType, country, genre: currentGenre, sort, page }, signal),
+    [searching, mediaType, query, country, currentGenre, sort],
   );
   const list = usePagedList(key, configured ? fetcher : null);
-
-  // В режиме поиска страну фильтруем на клиенте: TMDB-поиск не умеет фильтровать по стране.
-  const items = useMemo(
-    () => (searching && country ? list.items.filter((d) => d.originCountries.includes(country)) : list.items),
-    [list.items, searching, country],
-  );
 
   return (
     <>
       <header className="topbar">
-        <h1>Дорамы</h1>
+        <div className="topbar-row">
+          <h1>Дорамы</h1>
+          <div className="segmented" role="tablist">
+            {MEDIA_TYPES.map((m) => (
+              <button
+                key={m.id}
+                role="tab"
+                aria-selected={mediaType === m.id}
+                data-active={mediaType === m.id}
+                onClick={() => setMediaType(m.id)}
+              >
+                {m.title}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="searchbox">
           <input
             type="search"
-            placeholder="Поиск дорамы по названию"
+            placeholder={mediaType === 'tv' ? 'Поиск сериала по названию' : 'Поиск фильма по названию'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoCorrect="off"
@@ -52,9 +74,13 @@ export function Catalog() {
         </div>
         {!searching && (
           <div className="topbar-controls">
-            <select value={genre} onChange={(e) => setGenre(e.target.value)} aria-label="Жанр">
+            <select
+              value={currentGenre}
+              onChange={(e) => setGenre({ ...genre, [mediaType]: e.target.value })}
+              aria-label="Жанр"
+            >
               <option value="">Все жанры</option>
-              {GENRES.map((g) => (
+              {GENRES_BY_TYPE[mediaType].map((g) => (
                 <option key={g.id} value={String(g.id)}>
                   {g.title}
                 </option>
@@ -69,11 +95,7 @@ export function Catalog() {
             </select>
           </div>
         )}
-        <Chips
-          value={country}
-          onChange={setCountry}
-          options={[{ value: '', label: 'Все' }, ...COUNTRIES.map((c) => ({ value: c.code, label: `${c.flag} ${c.title}` }))]}
-        />
+        <Chips value={country} onChange={setCountry} options={COUNTRY_OPTIONS} />
       </header>
 
       <div className="content">
@@ -90,14 +112,18 @@ export function Catalog() {
               </button>
             }
           />
-        ) : !list.loading && items.length === 0 ? (
+        ) : !list.loading && list.items.length === 0 ? (
           searching ? (
-            <EmptyState icon="🤷" title="Ничего не нашлось" text={`По запросу «${query}» нет дорам${country ? ' из этой страны' : ''}.`} />
+            <EmptyState
+              icon="🤷"
+              title="Ничего не нашлось"
+              text={`По запросу «${query}» ничего нет${country === WORLD ? '' : ' среди выбранных стран. Попробуйте «Весь мир»'}.`}
+            />
           ) : (
             <EmptyState icon="📺" title="Ничего не найдено" text="Попробуйте другую страну или жанр." />
           )
         ) : (
-          <DramaGrid items={items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
+          <DramaGrid items={list.items} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
         )}
       </div>
     </>
