@@ -28,6 +28,11 @@ export default defineConfig({
         navigateFallback: '/doramy/index.html',
         runtimeCaching: [
           {
+            urlPattern: /\/doramy\/news\.json$/,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'news', networkTimeoutSeconds: 6, expiration: { maxEntries: 2 } },
+          },
+          {
             urlPattern: /^https:\/\/image\.tmdb\.org\//,
             handler: 'CacheFirst',
             options: {

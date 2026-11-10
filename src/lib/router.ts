@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LibraryKind, MediaType } from './types';
 
-export type Tab = 'catalog' | 'library' | 'profile';
+export type Tab = 'catalog' | 'library' | 'feed' | 'profile';
 export type Overlay = 'settings' | 'notes' | 'history';
 
 export interface Route {
@@ -14,7 +14,7 @@ export interface Route {
   overlay: Overlay | null;
 }
 
-const TABS: Tab[] = ['catalog', 'library', 'profile'];
+const TABS: Tab[] = ['catalog', 'library', 'feed', 'profile'];
 const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
 const OVERLAYS: Overlay[] = ['settings', 'notes', 'history'];
 

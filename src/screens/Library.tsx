@@ -3,8 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Chips } from '../components/Chips';
 import { EmptyState } from '../components/DramaGrid';
 import { Poster } from '../components/Poster';
+import { Refreshable } from '../components/Refreshable';
 import { db, updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
+import { syncNow } from '../lib/sync';
 import {
   countryLabel,
   formatRuntime,
@@ -180,7 +182,7 @@ export function Library({
         )}
       </header>
 
-      <div className="content">
+      <Refreshable onRefresh={() => syncNow()}>
         {section.length === 0 ? (
           <EmptyState title={`${kindInfo.title}: пусто`} text={kindInfo.empty} />
         ) : items.length === 0 ? (
@@ -192,7 +194,7 @@ export function Library({
             ))}
           </ul>
         )}
-      </div>
+      </Refreshable>
     </>
   );
 }

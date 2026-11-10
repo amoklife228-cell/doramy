@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { InstallHint } from '../components/InstallHint';
 import { Poster } from '../components/Poster';
+import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
 import { openDrama } from '../lib/router';
@@ -69,6 +71,7 @@ export function Catalog() {
   const [sort, setSort] = useState<DiscoverSort>('popular');
   const [text, setText] = useState('');
   const [randomBusy, setRandomBusy] = useState(false);
+  const [homeRefresh, setHomeRefresh] = useState(0);
 
   const query = useDebounced(text.trim(), 400);
   const searching = query.length >= 2;
@@ -177,7 +180,16 @@ export function Catalog() {
         <MultiChips options={chipOptions} active={activeChips} onToggle={onChip} />
       </header>
 
-      <div className="content">
+      <Refreshable
+        onRefresh={() => {
+          if (resultsMode) list.reload();
+          else {
+            recCache.delete(mediaType);
+            setHomeRefresh((n) => n + 1);
+          }
+          return new Promise((r) => setTimeout(r, 600));
+        }}
+      >
         {!configured ? (
           <NotConfigured />
         ) : resultsMode ? (
@@ -216,9 +228,12 @@ export function Catalog() {
             )}
           </>
         ) : (
-          <CatalogHome mediaType={mediaType} library={library} onGenre={pickGenre} />
+          <>
+            <InstallHint />
+            <CatalogHome mediaType={mediaType} library={library} onGenre={pickGenre} refreshKey={homeRefresh} />
+          </>
         )}
-      </div>
+      </Refreshable>
     </>
   );
 }
@@ -252,10 +267,12 @@ function CatalogHome({
   mediaType,
   library,
   onGenre,
+  refreshKey,
 }: {
   mediaType: MediaType;
   library: SavedDrama[];
   onGenre: (id: number, sort?: DiscoverSort) => void;
+  refreshKey: number;
 }) {
   const configured = useConfigured();
   // Опора для рекомендаций: избранное и просмотренное/смотрю этого типа, самые свежие.
@@ -320,7 +337,7 @@ function CatalogHome({
     return () => controller.abort();
     // libraryKeys меняется при каждом изменении библиотеки; пересчёт нужен только при смене опоры.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configured, mediaType, basis]);
+  }, [configured, mediaType, basis, refreshKey]);
 
   const moodBg = recs?.items.find((d) => d.backdropPath)?.backdropPath ?? null;
 

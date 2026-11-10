@@ -141,6 +141,7 @@ interface DetailDTO extends ListItemDTO {
   runtime?: number;
   episode_run_time?: number[];
   last_episode_to_air?: { runtime?: number | null } | null;
+  next_episode_to_air?: { air_date?: string; episode_number?: number; season_number?: number; name?: string } | null;
   status?: string;
   production_countries?: { iso_3166_1: string }[];
 }
@@ -244,6 +245,14 @@ export async function details(mediaType: MediaType, id: number, signal?: AbortSi
     runtime: d.runtime,
     episodeRuntime: d.episode_run_time?.[0] || d.last_episode_to_air?.runtime || undefined,
     airStatus: d.status,
+    nextEpisode: d.next_episode_to_air?.air_date
+      ? {
+          airDate: d.next_episode_to_air.air_date,
+          number: d.next_episode_to_air.episode_number ?? 0,
+          season: d.next_episode_to_air.season_number ?? 1,
+          name: d.next_episode_to_air.name ?? '',
+        }
+      : undefined,
   };
 }
 

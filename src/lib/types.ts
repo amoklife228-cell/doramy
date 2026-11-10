@@ -26,6 +26,8 @@ export interface Drama {
   /** Длительность одной серии в минутах (сериалы) */
   episodeRuntime?: number;
   airStatus?: string;
+  /** Ближайшая серия, если сериал ещё выходит */
+  nextEpisode?: { airDate: string; number: number; season: number; name: string };
 }
 
 export type WatchStatus = 'planned' | 'watching' | 'completed' | 'onHold' | 'dropped';

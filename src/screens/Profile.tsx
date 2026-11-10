@@ -3,8 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { BottomSheet } from '../components/BottomSheet';
 import { Poster } from '../components/Poster';
+import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
 import { navigate, openDrama, openSettings } from '../lib/router';
+import { syncNow } from '../lib/sync';
 import { buildHeatmap, computeAchievements, computeStats, type Achievement, type ProfileStats } from '../lib/stats';
 import { kindOf, LIBRARY_KINDS, type LibraryKind, type SavedDrama } from '../lib/types';
 
@@ -39,7 +41,7 @@ export function Profile({ session }: { session: Session | null | undefined }) {
         </button>
       </header>
 
-      <div className="content profile">
+      <Refreshable onRefresh={() => syncNow()} className="profile">
         <div className="avatar" aria-hidden>
           {email ? initial : <GlassesIcon />}
         </div>
@@ -83,7 +85,7 @@ export function Profile({ session }: { session: Session | null | undefined }) {
             ))}
           </div>
         </section>
-      </div>
+      </Refreshable>
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню профиля">
         <ProgressRows stats={stats} achievements={achievements} />

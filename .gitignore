@@ -3,5 +3,7 @@ dist
 dev-dist
 # иконки генерируются скриптом: npm run icons
 public/*.png
+# лента новостей собирается на CI: npm run news
+public/news.json
 .DS_Store
 *.log

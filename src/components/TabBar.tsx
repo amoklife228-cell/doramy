@@ -21,6 +21,16 @@ const TABS: { id: Tab; title: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'feed',
+    title: 'Лента',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M7 9h6M7 13h10M7 17h10M15 9h2" />
+      </svg>
+    ),
+  },
+  {
     id: 'profile',
     title: 'Профиль',
     icon: (
