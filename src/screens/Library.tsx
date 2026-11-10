@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Chips } from '../components/Chips';
 import { EmptyState } from '../components/DramaGrid';
@@ -8,16 +8,17 @@ import { openDrama } from '../lib/router';
 import {
   countryOf,
   formatRuntime,
+  kindOf,
+  LIBRARY_KINDS,
   STATUS_BY_ID,
   STATUSES,
   yearOf,
-  type MediaType,
+  type LibraryKind,
   type SavedDrama,
   type WatchStatus,
 } from '../lib/types';
 
 type SortId = 'addedNewest' | 'updated' | 'title' | 'userRating' | 'tmdbRating' | 'year' | 'progress';
-type TypeFilter = 'all' | MediaType;
 
 const SORTS: { id: SortId; title: string }[] = [
   { id: 'addedNewest', title: 'Недавно добавленные' },
@@ -29,11 +30,16 @@ const SORTS: { id: SortId; title: string }[] = [
   { id: 'progress', title: 'По прогрессу' },
 ];
 
-const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
-  { value: 'all', label: 'Всё' },
-  { value: 'tv', label: '📺 Сериалы' },
-  { value: 'movie', label: '🎬 Фильмы' },
-];
+const KIND_STORAGE = 'doramy.library.kind';
+
+function loadKind(): LibraryKind {
+  try {
+    const v = localStorage.getItem(KIND_STORAGE) as LibraryKind | null;
+    return v && LIBRARY_KINDS.some((k) => k.id === v) ? v : 'dorama';
+  } catch {
+    return 'dorama';
+  }
+}
 
 export function progressOf(s: SavedDrama): number | null {
   if (s.mediaType === 'movie') return s.status === 'completed' ? 1 : null;
@@ -43,11 +49,10 @@ export function progressOf(s: SavedDrama): number | null {
 
 export function applyQuery(
   items: SavedDrama[],
-  q: { type: TypeFilter; status: WatchStatus | ''; favoritesOnly: boolean; search: string; sort: SortId },
+  q: { status: WatchStatus | ''; favoritesOnly: boolean; search: string; sort: SortId },
 ): SavedDrama[] {
   const needle = q.search.trim().toLowerCase();
   const filtered = items.filter((s) => {
-    if (q.type !== 'all' && s.mediaType !== q.type) return false;
     if (q.status && s.status !== q.status) return false;
     if (q.favoritesOnly && !s.isFavorite) return false;
     if (needle && !s.title.toLowerCase().includes(needle) && !s.originalTitle.toLowerCase().includes(needle)) return false;
@@ -67,28 +72,41 @@ export function applyQuery(
 
 export function Library() {
   const all = useLiveQuery(() => db.items.toArray(), []) ?? [];
-  const [type, setType] = useState<TypeFilter>('all');
+  const [kind, setKind] = useState<LibraryKind>(loadKind);
   const [status, setStatus] = useState<WatchStatus | ''>('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortId>('addedNewest');
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(KIND_STORAGE, kind);
+    } catch {
+      // ignore
+    }
+  }, [kind]);
+
+  // Записи текущего раздела и количество в каждом разделе.
+  const byKind = useMemo(() => {
+    const m: Record<LibraryKind, SavedDrama[]> = { dorama: [], series: [], movie: [] };
+    for (const s of all) m[kindOf(s)].push(s);
+    return m;
+  }, [all]);
+  const section = byKind[kind];
+
   const items = useMemo(
-    () => applyQuery(all, { type, status, favoritesOnly, search, sort }),
-    [all, type, status, favoritesOnly, search, sort],
+    () => applyQuery(section, { status, favoritesOnly, search, sort }),
+    [section, status, favoritesOnly, search, sort],
   );
 
   const counts = useMemo(() => {
     const m = new Map<WatchStatus, number>();
-    for (const s of all) if (type === 'all' || s.mediaType === type) m.set(s.status, (m.get(s.status) ?? 0) + 1);
+    for (const s of section) m.set(s.status, (m.get(s.status) ?? 0) + 1);
     return m;
-  }, [all, type]);
-
-  const total = type === 'all' ? all.length : all.filter((s) => s.mediaType === type).length;
-  const hasMovies = all.some((s) => s.mediaType === 'movie');
+  }, [section]);
 
   const chipOptions = [
-    { value: '' as WatchStatus | '', label: 'Все', count: total },
+    { value: '' as WatchStatus | '', label: 'Все', count: section.length },
     ...STATUSES.filter((s) => (counts.get(s.id) ?? 0) > 0).map((s) => ({
       value: s.id as WatchStatus | '',
       label: s.short,
@@ -96,36 +114,33 @@ export function Library() {
     })),
   ];
 
+  const kindInfo = LIBRARY_KINDS.find((k) => k.id === kind)!;
+
   return (
     <>
       <header className="topbar">
-        <div className="topbar-row">
-          <h1>Библиотека</h1>
-          {hasMovies && (
-            <div className="segmented" role="tablist">
-              {TYPE_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  role="tab"
-                  aria-selected={type === o.value}
-                  data-active={type === o.value}
-                  onClick={() => setType(o.value)}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          )}
+        <h1>Библиотека</h1>
+        <div className="segmented segmented-wide" role="tablist">
+          {LIBRARY_KINDS.map((k) => (
+            <button
+              key={k.id}
+              role="tab"
+              aria-selected={kind === k.id}
+              data-active={kind === k.id}
+              onClick={() => {
+                setKind(k.id);
+                setStatus('');
+              }}
+            >
+              {k.icon} {k.title}
+              {byKind[k.id].length > 0 && <span className="chip-count">{byKind[k.id].length}</span>}
+            </button>
+          ))}
         </div>
-        {all.length > 0 && (
+        {section.length > 0 && (
           <>
             <div className="topbar-controls">
-              <input
-                type="search"
-                placeholder="Поиск"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <input type="search" placeholder="Поиск" value={search} onChange={(e) => setSearch(e.target.value)} />
               <select value={sort} onChange={(e) => setSort(e.target.value as SortId)} aria-label="Сортировка">
                 {SORTS.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -145,12 +160,8 @@ export function Library() {
       </header>
 
       <div className="content">
-        {all.length === 0 ? (
-          <EmptyState
-            icon="📚"
-            title="Библиотека пуста"
-            text="Откройте сериал или фильм в каталоге и нажмите «Добавить в библиотеку»."
-          />
+        {section.length === 0 ? (
+          <EmptyState icon={kindInfo.icon} title={`${kindInfo.title}: пусто`} text={kindInfo.empty} />
         ) : items.length === 0 ? (
           <EmptyState icon="🔎" title="Ничего не найдено" text="Под текущий фильтр нет записей." />
         ) : (
@@ -172,7 +183,7 @@ function LibraryRow({ item }: { item: SavedDrama }) {
   const progress = item.mediaType === 'tv' ? progressOf(item) : null;
   const extra =
     item.mediaType === 'movie'
-      ? [formatRuntime(item.runtime), 'фильм'].filter(Boolean).join(', ')
+      ? (formatRuntime(item.runtime) ?? '')
       : item.episodeCount
         ? `${item.episodeCount} эп.`
         : '';
@@ -184,7 +195,7 @@ function LibraryRow({ item }: { item: SavedDrama }) {
         <div className="row-body">
           <div className="row-title">{item.title}</div>
           <div className="row-sub">
-            {country?.flag} {year ?? ''}
+            {country?.flag ?? ''} {year ?? ''}
             {extra ? ` · ${extra}` : ''}
           </div>
           <div className="row-meta">

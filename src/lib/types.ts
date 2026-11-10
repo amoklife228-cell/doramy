@@ -143,6 +143,22 @@ export const SORTS: { id: DiscoverSort; title: string }[] = [
   { id: 'newest', title: 'Сначала новые' },
 ];
 
+/** Раздел библиотеки: азиатские сериалы — дорамы, остальные сериалы отдельно, фильмы отдельно. */
+export type LibraryKind = 'dorama' | 'series' | 'movie';
+
+export const LIBRARY_KINDS: { id: LibraryKind; title: string; icon: string; empty: string }[] = [
+  { id: 'dorama', title: 'Дорамы', icon: '🌸', empty: 'Дорам пока нет. Откройте каталог сериалов и добавьте первую.' },
+  { id: 'series', title: 'Сериалы', icon: '📺', empty: 'Сериалов из других стран пока нет. В каталоге выберите «Весь мир».' },
+  { id: 'movie', title: 'Фильмы', icon: '🎬', empty: 'Фильмов пока нет. Переключите каталог на «Фильмы».' },
+];
+
+export function kindOf(item: { mediaType: MediaType; originCountries: string[] }): LibraryKind {
+  if (item.mediaType === 'movie') return 'movie';
+  // Страна неизвестна — считаем дорамой: каталог по умолчанию показывает Азию.
+  if (item.originCountries.length === 0 || item.originCountries.some((c) => COUNTRY_CODES.has(c))) return 'dorama';
+  return 'series';
+}
+
 export function countryOf(codes: string[]): Country | undefined {
   return COUNTRIES.find((c) => codes.includes(c.code));
 }

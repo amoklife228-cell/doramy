@@ -132,6 +132,21 @@ h2 {
   color: var(--text);
 }
 
+/* Во всю ширину: три равные секции (библиотека). */
+.segmented-wide {
+  display: flex;
+  width: 100%;
+}
+
+.segmented-wide button {
+  flex: 1;
+  padding: 8px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
 .badge-type {
   top: auto;
   right: auto;
