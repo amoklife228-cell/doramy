@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Poster } from '../components/Poster';
+import { TrailerBlock } from '../components/TrailerBlock';
 import { addToLibrary, db, refreshMetadata, removeEntry, updateEntry } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { goBack } from '../lib/router';
@@ -85,6 +86,17 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
           ) : (
             <AddButtons drama={drama} />
           )}
+
+          <a
+            className="btn btn-wide btn-search"
+            href={searchUrl(drama.title, drama.originalTitle, yearOf(drama.firstAirDate), isMovie)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Найти в интернете
+          </a>
+
+          <TrailerBlock mediaType={mediaType} id={id} enabled={configured} />
 
           {drama.overview && (
             <section className="block">
@@ -291,6 +303,15 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
       )}
     </section>
   );
+}
+
+/** Поиск по названию в интернете: русское название, оригинал и год, чтобы выдача была точной. */
+function searchUrl(title: string, original: string, year: number | null, isMovie: boolean): string {
+  const parts = [title];
+  if (original && original !== title) parts.push(original);
+  if (year) parts.push(String(year));
+  parts.push(isMovie ? 'фильм' : 'дорама');
+  return `https://www.google.com/search?q=${encodeURIComponent(parts.join(' '))}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

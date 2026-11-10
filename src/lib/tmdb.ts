@@ -273,6 +273,43 @@ export async function details(mediaType: MediaType, id: number, signal?: AbortSi
   };
 }
 
+export interface Video {
+  key: string; // id ролика на YouTube
+  name: string;
+  type: string; // Trailer, Teaser, Clip...
+  lang: string;
+  official: boolean;
+}
+
+interface VideoDTO {
+  key: string;
+  name: string;
+  site: string;
+  type: string;
+  iso_639_1?: string;
+  official?: boolean;
+  published_at?: string;
+}
+
+/** Трейлеры и тизеры с YouTube: сначала русские, потом английские, потом остальные; официальные выше. */
+export async function videos(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Video[]> {
+  const r = await fetchJSON<{ results: VideoDTO[] }>(
+    `/${mediaType}/${id}/videos`,
+    { include_video_language: 'ru,en,ko,ja,zh,th,null' },
+    signal,
+  );
+  const rank = (v: VideoDTO) => {
+    const lang = v.iso_639_1 === 'ru' ? 0 : v.iso_639_1 === 'en' ? 1 : 2;
+    const type = v.type === 'Trailer' ? 0 : v.type === 'Teaser' ? 1 : 2;
+    return lang * 10 + type * 3 + (v.official ? 0 : 1);
+  };
+  return (r.results ?? [])
+    .filter((v) => v.site === 'YouTube' && v.key && (v.type === 'Trailer' || v.type === 'Teaser' || v.type === 'Clip' || v.type === 'Opening Credits'))
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, 6)
+    .map((v) => ({ key: v.key, name: v.name, type: v.type, lang: v.iso_639_1 ?? '', official: !!v.official }));
+}
+
 /** Похожие по мнению TMDB: первая страница рекомендаций к конкретному сериалу или фильму. */
 export async function recommendations(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Drama[]> {
   const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: '1' }, signal);
