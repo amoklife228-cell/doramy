@@ -5,6 +5,29 @@ import { db, exportLibrary, importLibrary } from '../lib/db';
 import { goBack } from '../lib/router';
 import { AccountSection } from './Account';
 
+/** Строка для отладки: режим запуска, размеры окна и отступы безопасной зоны. */
+function diagnostics(): string {
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden';
+  document.body.appendChild(probe);
+  const safeBottom = Math.round(probe.getBoundingClientRect().height);
+  probe.remove();
+  const vv = window.visualViewport;
+  return [
+    `Режим: ${standalone ? 'приложение' : 'браузер'}`,
+    `окно ${window.innerWidth}×${window.innerHeight}`,
+    vv ? `видимая область ${Math.round(vv.width)}×${Math.round(vv.height)}` : '',
+    `экран ${screen.width}×${screen.height}`,
+    `нижний отступ ${safeBottom}`,
+    `iOS ${/OS (\d+)_/.exec(navigator.userAgent)?.[1] ?? '?'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export function Settings({ session }: { session: Session | null | undefined }) {
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
 
@@ -93,6 +116,7 @@ export function Settings({ session }: { session: Session | null | undefined }) {
           Данные о сериалах и фильмах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не
           сертифицирован TMDB.
         </p>
+        <p className="muted small">{diagnostics()}</p>
       </div>
     </div>
   );
