@@ -28,7 +28,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, system-ui, sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
@@ -242,10 +242,10 @@ input[type='search']::-webkit-search-cancel-button {
 
 .chip {
   flex: none;
-  padding: 7px 12px;
+  padding: 9px 14px;
   border-radius: 999px;
   background: var(--bg-elev);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
@@ -273,13 +273,13 @@ input[type='search']::-webkit-search-cancel-button {
 /* Сетка карточек */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 14px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px 14px;
 }
 
 @media (min-width: 600px) {
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
 }
 
@@ -341,7 +341,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.25;
   display: -webkit-box;
@@ -352,7 +352,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .card-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -460,9 +460,9 @@ input[type='search']::-webkit-search-cancel-button {
 
 .row-poster {
   flex: none;
-  width: 56px;
-  height: 84px;
-  border-radius: 8px;
+  width: 68px;
+  height: 102px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -484,14 +484,14 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .row-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 
 .row-meta {
   display: flex;
   gap: 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -588,8 +588,8 @@ input[type='search']::-webkit-search-cancel-button {
 
 .hero-poster {
   flex: none;
-  width: 130px;
-  height: 195px;
+  width: 140px;
+  height: 210px;
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
@@ -973,7 +973,7 @@ code {
 
 .strip-item {
   flex: none;
-  width: 96px;
+  width: 110px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -982,8 +982,8 @@ code {
 }
 
 .strip-poster {
-  width: 96px;
-  height: 144px;
+  width: 110px;
+  height: 165px;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -999,7 +999,7 @@ code {
 }
 
 .strip-title {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1385,8 +1385,8 @@ code {
 .genre-card {
   position: relative;
   flex: none;
-  width: 164px;
-  height: 150px;
+  width: 176px;
+  height: 160px;
   border-radius: 16px;
   padding: 14px;
   color: #fff;
@@ -1437,7 +1437,7 @@ code {
 
 .rec {
   flex: none;
-  width: min(78vw, 300px);
+  width: min(82vw, 320px);
   text-align: left;
   color: inherit;
 }
@@ -1931,7 +1931,7 @@ code {
   justify-content: center;
   gap: 2px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 
