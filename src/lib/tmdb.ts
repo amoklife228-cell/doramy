@@ -28,8 +28,15 @@ function safeGet(key: string): string {
   }
 }
 
+/** Ключ, вшитый в приложение: работает у всех без настройки. Свой ключ в «Настройках» имеет приоритет. */
+export const BUILTIN_KEY: string = (import.meta.env.VITE_TMDB_KEY as string | undefined)?.trim() ?? '';
+
 export function getCredential(): string {
-  return safeGet(TOKEN_STORAGE) || safeGet(KEY_STORAGE);
+  return safeGet(TOKEN_STORAGE) || safeGet(KEY_STORAGE) || BUILTIN_KEY;
+}
+
+export function hasOwnCredential(): boolean {
+  return (safeGet(TOKEN_STORAGE) || safeGet(KEY_STORAGE)).length > 0;
 }
 
 export function isConfigured(): boolean {
@@ -64,8 +71,12 @@ export function clearCredential() {
 }
 
 async function fetchJSON<T>(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<T> {
-  const token = safeGet(TOKEN_STORAGE);
-  const apiKey = safeGet(KEY_STORAGE);
+  let token = safeGet(TOKEN_STORAGE);
+  let apiKey = safeGet(KEY_STORAGE);
+  if (!token && !apiKey) {
+    if (BUILTIN_KEY.startsWith('eyJ')) token = BUILTIN_KEY;
+    else apiKey = BUILTIN_KEY;
+  }
   if (!token && !apiKey) throw new TMDBError('Не указан ключ TMDB. Откройте «Настройки».');
 
   const url = new URL(BASE + path);

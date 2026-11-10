@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, exportLibrary, importLibrary } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
-import { clearCredential, getCredential, saveCredential } from '../lib/tmdb';
+import { BUILTIN_KEY, clearCredential, getCredential, hasOwnCredential, saveCredential } from '../lib/tmdb';
 
 export function Settings() {
   const configured = useConfigured();
@@ -59,9 +59,11 @@ export function Settings() {
       <div className="content settings">
         <section className="block">
           <h2>Ключ TMDB</h2>
-          {configured ? (
+          {configured && !hasOwnCredential() && BUILTIN_KEY ? (
+            <p className="muted">Используется встроенный ключ, ничего настраивать не нужно. При желании можно указать свой.</p>
+          ) : configured ? (
             <p className="muted">
-              Ключ сохранён: <code>{masked}</code>
+              Ваш ключ сохранён: <code>{masked}</code>
             </p>
           ) : (
             <p className="muted">
@@ -75,7 +77,7 @@ export function Settings() {
           <div className="keyform">
             <input
               type="text"
-              placeholder={configured ? 'Вставьте новый ключ, чтобы заменить' : 'Вставьте ключ сюда'}
+              placeholder={hasOwnCredential() ? 'Вставьте новый ключ, чтобы заменить' : 'Вставьте свой ключ (необязательно)'}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               autoCorrect="off"
@@ -86,9 +88,9 @@ export function Settings() {
               Сохранить
             </button>
           </div>
-          {configured && (
-            <button className="btn btn-danger-text" onClick={() => { clearCredential(); setMessage('Ключ удалён.'); }}>
-              Удалить ключ
+          {hasOwnCredential() && (
+            <button className="btn btn-danger-text" onClick={() => { clearCredential(); setMessage('Свой ключ удалён.'); }}>
+              Удалить свой ключ
             </button>
           )}
         </section>
