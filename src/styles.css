@@ -1159,12 +1159,10 @@ code {
 
 @keyframes sheet-up {
   from {
-    transform: translateY(40px);
-    opacity: 0;
+    transform: translateY(100%);
   }
   to {
     transform: none;
-    opacity: 1;
   }
 }
 
