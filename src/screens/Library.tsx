@@ -122,7 +122,7 @@ export function Library() {
             <div className="topbar-controls">
               <input
                 type="search"
-                placeholder="Поиск в библиотеке"
+                placeholder="Поиск"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
