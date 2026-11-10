@@ -139,6 +139,8 @@ interface DetailDTO extends ListItemDTO {
   number_of_episodes?: number;
   number_of_seasons?: number;
   runtime?: number;
+  episode_run_time?: number[];
+  last_episode_to_air?: { runtime?: number | null } | null;
   status?: string;
   production_countries?: { iso_3166_1: string }[];
 }
@@ -237,6 +239,7 @@ export async function details(mediaType: MediaType, id: number, signal?: AbortSi
     episodeCount: d.number_of_episodes,
     seasonCount: d.number_of_seasons,
     runtime: d.runtime,
+    episodeRuntime: d.episode_run_time?.[0] || d.last_episode_to_air?.runtime || undefined,
     airStatus: d.status,
   };
 }

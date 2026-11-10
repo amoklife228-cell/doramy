@@ -19,3 +19,23 @@ create policy "own rows" on public.library
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Активность по дням: сколько серий (фильм = 1) и минут посмотрено.
+create table if not exists public.activity (
+  user_id    uuid        not null references auth.users (id) on delete cascade,
+  day        date        not null,
+  units      integer     not null default 0,
+  minutes    integer     not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
+
+create index if not exists activity_user_updated on public.activity (user_id, updated_at);
+
+alter table public.activity enable row level security;
+
+drop policy if exists "own activity" on public.activity;
+create policy "own activity" on public.activity
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

@@ -1,28 +1,37 @@
 import { useEffect, useState } from 'react';
-import type { MediaType } from './types';
+import type { LibraryKind, MediaType } from './types';
 
-export type Tab = 'catalog' | 'library' | 'settings';
+export type Tab = 'catalog' | 'library' | 'profile';
 
 export interface Route {
   tab: Tab;
+  /** Раздел библиотеки из адреса `#/library/<kind>`, если указан. */
+  libraryKind: LibraryKind | null;
   detail: { mediaType: MediaType; id: number } | null;
+  settings: boolean;
 }
 
-const TABS: Tab[] = ['catalog', 'library', 'settings'];
+const TABS: Tab[] = ['catalog', 'library', 'profile'];
+const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
 
 let lastTab: Tab = 'catalog';
 
 export function parseHash(hash: string): Route {
   const path = hash.replace(/^#/, '');
+  const base: Route = { tab: lastTab, libraryKind: null, detail: null, settings: false };
+
   const detail = path.match(/^\/(tv|movie|drama)\/(\d+)/);
   if (detail) {
     const mediaType: MediaType = detail[1] === 'movie' ? 'movie' : 'tv';
-    return { tab: lastTab, detail: { mediaType, id: Number(detail[2]) } };
+    return { ...base, detail: { mediaType, id: Number(detail[2]) } };
   }
-  const seg = path.replace(/^\//, '').split('/')[0] as Tab;
-  const tab = TABS.includes(seg) ? seg : 'catalog';
+  if (path.startsWith('/settings')) return { ...base, settings: true };
+
+  const [seg, sub] = path.replace(/^\//, '').split('/');
+  const tab = TABS.includes(seg as Tab) ? (seg as Tab) : 'catalog';
   lastTab = tab;
-  return { tab, detail: null };
+  const libraryKind = tab === 'library' && KINDS.includes(sub as LibraryKind) ? (sub as LibraryKind) : null;
+  return { tab, libraryKind, detail: null, settings: false };
 }
 
 export function useRoute(): Route {
@@ -41,6 +50,10 @@ export function navigate(path: string) {
 
 export function openDrama(mediaType: MediaType, id: number) {
   navigate(`/${mediaType}/${id}`);
+}
+
+export function openSettings() {
+  navigate('/settings');
 }
 
 export function goBack() {

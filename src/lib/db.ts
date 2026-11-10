@@ -1,18 +1,31 @@
 import Dexie, { type Table } from 'dexie';
-import { itemKey, type Drama, type LibraryKind, type MediaType, type SavedDrama, type WatchStatus } from './types';
+import {
+  itemKey,
+  minutesPerUnit,
+  todayKey,
+  type ActivityDay,
+  type Drama,
+  type LibraryKind,
+  type MediaType,
+  type SavedDrama,
+  type WatchStatus,
+} from './types';
 
 /** Запись первой версии базы: только сериалы, ключ — числовой tmdbId. */
 type LegacySaved = Omit<SavedDrama, 'key' | 'mediaType'>;
 
+export type OutboxOp = 'put' | 'delete' | 'activity';
+
 interface OutboxRow {
   key: string;
-  op: 'put' | 'delete';
+  op: OutboxOp;
   ts: number;
 }
 
 class DoramyDB extends Dexie {
   items!: Table<SavedDrama, string>;
   outbox!: Table<OutboxRow, string>;
+  activity!: Table<ActivityDay, string>;
 
   constructor() {
     super('doramy');
@@ -43,19 +56,40 @@ class DoramyDB extends Dexie {
       items: 'key, mediaType, status, isFavorite, addedAt, updatedAt',
       outbox: 'key',
     });
+    // v5: активность по дням для профиля.
+    this.version(5).stores({
+      items: 'key, mediaType, status, isFavorite, addedAt, updatedAt',
+      outbox: 'key',
+      activity: 'day',
+    });
   }
-}
-
-/** Подключается из sync.ts, чтобы db.ts не зависел от него (иначе циклический импорт). */
-let onChange: ((key: string, op: 'put' | 'delete') => void) | null = null;
-export function setChangeListener(fn: typeof onChange) {
-  onChange = fn;
 }
 
 export const db = new DoramyDB();
 
+/** Подключается из sync.ts, чтобы db.ts не зависел от него (иначе циклический импорт). */
+let onChange: ((key: string, op: OutboxOp) => void) | null = null;
+export function setChangeListener(fn: typeof onChange) {
+  onChange = fn;
+}
+
+/** Засчитать просмотр: units серий (фильм = 1), minutes минут, за сегодняшний день. */
+export async function logActivity(units: number, minutes: number, day = todayKey()): Promise<void> {
+  if (units <= 0) return;
+  const existing = await db.activity.get(day);
+  const row: ActivityDay = {
+    day,
+    units: (existing?.units ?? 0) + units,
+    minutes: (existing?.minutes ?? 0) + Math.max(0, Math.round(minutes)),
+    updatedAt: Date.now(),
+  };
+  await db.activity.put(row);
+  onChange?.(day, 'activity');
+}
+
 export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<void> {
   const now = Date.now();
+  const watched = status === 'completed' ? (drama.mediaType === 'movie' ? 1 : (drama.episodeCount ?? 0)) : 0;
   const entry: SavedDrama = {
     key: itemKey(drama.mediaType, drama.id),
     mediaType: drama.mediaType,
@@ -71,9 +105,10 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
     genreNames: drama.genreNames,
     episodeCount: drama.episodeCount,
     runtime: drama.runtime,
+    episodeRuntime: drama.episodeRuntime,
     status,
     userRating: null,
-    episodesWatched: status === 'completed' ? (drama.episodeCount ?? 0) : 0,
+    episodesWatched: drama.mediaType === 'movie' ? 0 : watched,
     notes: '',
     isFavorite: false,
     addedAt: now,
@@ -81,11 +116,27 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
   };
   await db.items.put(entry);
   onChange?.(entry.key, 'put');
+  if (watched > 0) await logActivity(watched, watched * minutesPerUnit(drama));
 }
 
+/**
+ * Обновить запись. Если выросло число просмотренных серий или фильм стал «просмотрен»,
+ * разница засчитывается в активность за сегодня.
+ */
 export async function updateEntry(key: string, patch: Partial<SavedDrama>): Promise<void> {
+  const before = await db.items.get(key);
   await db.items.update(key, { ...patch, updatedAt: Date.now() });
   onChange?.(key, 'put');
+  if (!before) return;
+
+  if (before.mediaType === 'movie') {
+    if (patch.status === 'completed' && before.status !== 'completed') {
+      await logActivity(1, minutesPerUnit(before));
+    }
+  } else if (typeof patch.episodesWatched === 'number' && patch.episodesWatched > before.episodesWatched) {
+    const delta = patch.episodesWatched - before.episodesWatched;
+    await logActivity(delta, delta * minutesPerUnit(before));
+  }
 }
 
 export async function removeEntry(key: string): Promise<void> {
@@ -110,21 +161,27 @@ export async function refreshMetadata(drama: Drama): Promise<void> {
     genreNames: drama.genreNames.length ? drama.genreNames : existing.genreNames,
     episodeCount: drama.episodeCount ?? existing.episodeCount,
     runtime: drama.runtime ?? existing.runtime,
+    episodeRuntime: drama.episodeRuntime ?? existing.episodeRuntime,
   });
 }
 
 export async function exportLibrary(): Promise<string> {
   const items = await db.items.toArray();
-  return JSON.stringify({ app: 'doramy', version: 2, exportedAt: new Date().toISOString(), items }, null, 2);
+  const activity = await db.activity.toArray();
+  return JSON.stringify(
+    { app: 'doramy', version: 3, exportedAt: new Date().toISOString(), items, activity },
+    null,
+    2,
+  );
 }
 
 const STATUSES: WatchStatus[] = ['planned', 'watching', 'completed', 'onHold', 'dropped'];
 const MEDIA: MediaType[] = ['tv', 'movie'];
 const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
 
-/** Импорт: записи с тем же ключом заменяются. Понимает и файлы первой версии (без mediaType). */
+/** Импорт: записи с тем же ключом заменяются. Понимает и файлы первых версий. */
 export async function importLibrary(json: string): Promise<number> {
-  const parsed = JSON.parse(json) as { items?: unknown };
+  const parsed = JSON.parse(json) as { items?: unknown; activity?: unknown };
   if (!parsed || !Array.isArray(parsed.items)) throw new Error('Это не файл экспорта «Дорамы».');
   const items: SavedDrama[] = [];
   for (const raw of parsed.items as Partial<SavedDrama>[]) {
@@ -146,6 +203,7 @@ export async function importLibrary(json: string): Promise<number> {
       genreNames: raw.genreNames ?? [],
       episodeCount: raw.episodeCount,
       runtime: raw.runtime,
+      episodeRuntime: raw.episodeRuntime,
       kind: KINDS.includes(raw.kind as LibraryKind) ? (raw.kind as LibraryKind) : undefined,
       status: STATUSES.includes(raw.status as WatchStatus) ? (raw.status as WatchStatus) : 'planned',
       userRating: typeof raw.userRating === 'number' ? raw.userRating : null,
@@ -158,5 +216,15 @@ export async function importLibrary(json: string): Promise<number> {
   }
   await db.items.bulkPut(items);
   for (const it of items) onChange?.(it.key, 'put');
+
+  if (Array.isArray(parsed.activity)) {
+    const days: ActivityDay[] = [];
+    for (const raw of parsed.activity as Partial<ActivityDay>[]) {
+      if (typeof raw.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.day)) continue;
+      days.push({ day: raw.day, units: raw.units ?? 0, minutes: raw.minutes ?? 0, updatedAt: raw.updatedAt ?? Date.now() });
+    }
+    await db.activity.bulkPut(days);
+    for (const d of days) onChange?.(d.day, 'activity');
+  }
   return items.length;
 }

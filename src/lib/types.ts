@@ -23,6 +23,8 @@ export interface Drama {
   seasonCount?: number;
   /** Длительность фильма в минутах */
   runtime?: number;
+  /** Длительность одной серии в минутах (сериалы) */
+  episodeRuntime?: number;
   airStatus?: string;
 }
 
@@ -44,6 +46,7 @@ export interface SavedDrama {
   genreNames: string[];
   episodeCount?: number;
   runtime?: number;
+  episodeRuntime?: number;
   /** Раздел библиотеки, выбранный вручную. Нет — определяется автоматически (kindOf). */
   kind?: LibraryKind;
   status: WatchStatus;
@@ -231,5 +234,27 @@ export function savedToDrama(s: SavedDrama): Drama {
     genreNames: s.genreNames,
     episodeCount: s.episodeCount,
     runtime: s.runtime,
+    episodeRuntime: s.episodeRuntime,
   };
+}
+
+/** Сколько минут занимает одна «единица просмотра»: серия или фильм. Если TMDB не знает — средние значения. */
+export function minutesPerUnit(item: { mediaType: MediaType; runtime?: number; episodeRuntime?: number }): number {
+  if (item.mediaType === 'movie') return item.runtime && item.runtime > 0 ? item.runtime : 110;
+  return item.episodeRuntime && item.episodeRuntime > 0 ? item.episodeRuntime : 60;
+}
+
+/** Запись активности за день: сколько серий (фильм = 1) и минут посмотрено. */
+export interface ActivityDay {
+  /** "YYYY-MM-DD" в локальном времени */
+  day: string;
+  units: number;
+  minutes: number;
+  updatedAt: number;
+}
+
+export function todayKey(d = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { db, setChangeListener } from './db';
+import { db, setChangeListener, type OutboxOp } from './db';
 import { supabase } from './supabase';
-import type { MediaType, SavedDrama } from './types';
+import type { ActivityDay, MediaType, SavedDrama } from './types';
 
 // Каждое локальное изменение библиотеки попадает в очередь отправки.
 setChangeListener((key, op) => {
@@ -37,16 +37,11 @@ export function useSyncState(): SyncState {
 
 /* ---------- очередь исходящих изменений ---------- */
 
-export interface OutboxItem {
-  key: string;
-  op: 'put' | 'delete';
-  ts: number;
-}
-
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Записать изменение в очередь и отправить чуть позже (несколько правок подряд уйдут одним пакетом). */
-export async function enqueue(key: string, op: 'put' | 'delete'): Promise<void> {
+export async function enqueue(key: string, op: OutboxOp): Promise<void> {
+  // Ключи активности и записей не пересекаются: 'YYYY-MM-DD' vs 'tv:123'.
   await db.outbox.put({ key, op, ts: Date.now() });
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => void syncNow(), 600);
@@ -54,13 +49,21 @@ export async function enqueue(key: string, op: 'put' | 'delete'): Promise<void> 
 
 /* ---------- синхронизация ---------- */
 
-interface Row {
+interface LibraryRow {
   user_id: string;
   key: string;
   media_type: MediaType;
   tmdb_id: number;
   data: Partial<SavedDrama>;
   deleted: boolean;
+  updated_at: string;
+}
+
+interface ActivityRow {
+  user_id: string;
+  day: string;
+  units: number;
+  minutes: number;
   updated_at: string;
 }
 
@@ -102,10 +105,14 @@ async function run(): Promise<void> {
 
   setState({ status: 'syncing', error: null });
   try {
-    // Первый вход на этом устройстве: вся локальная библиотека уезжает в аккаунт.
+    // Первый вход на этом устройстве: вся локальная библиотека и активность уезжают в аккаунт.
     if (!pulledMark(uid)) {
       const local = await db.items.toArray();
-      await db.outbox.bulkPut(local.map((s) => ({ key: s.key, op: 'put' as const, ts: Date.now() })));
+      const days = await db.activity.toArray();
+      await db.outbox.bulkPut([
+        ...local.map((s) => ({ key: s.key, op: 'put' as const, ts: Date.now() })),
+        ...days.map((d) => ({ key: d.day, op: 'activity' as const, ts: Date.now() })),
+      ]);
     }
     await push(uid);
     await pull(uid);
@@ -120,8 +127,16 @@ async function push(uid: string): Promise<void> {
   const pending = await db.outbox.toArray();
   if (pending.length === 0) return;
 
-  const rows: Row[] = [];
+  const rows: LibraryRow[] = [];
+  const days: ActivityRow[] = [];
   for (const op of pending) {
+    if (op.op === 'activity') {
+      const d = await db.activity.get(op.key);
+      if (d) {
+        days.push({ user_id: uid, day: d.day, units: d.units, minutes: d.minutes, updated_at: new Date(d.updatedAt).toISOString() });
+      }
+      continue;
+    }
     const item = await db.items.get(op.key);
     if (op.op === 'put' && item) {
       rows.push({
@@ -147,35 +162,51 @@ async function push(uid: string): Promise<void> {
     }
   }
 
-  const { error } = await supabase.from('library').upsert(rows, { onConflict: 'user_id,key' });
-  if (error) throw new Error(error.message);
+  if (rows.length) {
+    const { error } = await supabase.from('library').upsert(rows, { onConflict: 'user_id,key' });
+    if (error) throw new Error(error.message);
+  }
+  if (days.length) {
+    const { error } = await supabase.from('activity').upsert(days, { onConflict: 'user_id,day' });
+    if (error) throw new Error(error.message);
+  }
 
   // Убираем только то, что отправили; новые правки, появившиеся во время запроса, остаются.
-  await db.outbox.bulkDelete(pending.map((p) => p.key)).catch(() => undefined);
   const newer = await db.outbox.toArray();
   for (const p of pending) {
     const n = newer.find((x) => x.key === p.key);
-    if (n && n.ts <= p.ts) await db.outbox.delete(p.key);
+    if (!n || n.ts <= p.ts) await db.outbox.delete(p.key);
   }
 }
 
 async function pull(uid: string): Promise<void> {
   if (!supabase) return;
   const since = pulledMark(uid) || '1970-01-01T00:00:00Z';
-  const { data, error } = await supabase
+  const pendingKeys = new Set((await db.outbox.toArray()).map((o) => o.key));
+  let mark = since;
+
+  const lib = await supabase
     .from('library')
     .select('*')
     .eq('user_id', uid)
     .gt('updated_at', since)
     .order('updated_at', { ascending: true })
     .limit(1000);
-  if (error) throw new Error(error.message);
+  if (lib.error) throw new Error(lib.error.message);
 
-  const rows = (data ?? []) as Row[];
-  let mark = since;
-  const pendingKeys = new Set((await db.outbox.toArray()).map((o) => o.key));
+  const act = await supabase
+    .from('activity')
+    .select('*')
+    .eq('user_id', uid)
+    .gt('updated_at', since)
+    .order('updated_at', { ascending: true })
+    .limit(2000);
+  if (act.error) throw new Error(act.error.message);
 
-  await db.transaction('rw', db.items, async () => {
+  const rows = (lib.data ?? []) as LibraryRow[];
+  const days = (act.data ?? []) as ActivityRow[];
+
+  await db.transaction('rw', db.items, db.activity, async () => {
     for (const row of rows) {
       const remoteTs = Date.parse(row.updated_at);
       const local = await db.items.get(row.key);
@@ -194,15 +225,26 @@ async function pull(uid: string): Promise<void> {
       }
       if (row.updated_at > mark) mark = row.updated_at;
     }
+    for (const d of days) {
+      const remoteTs = Date.parse(d.updated_at);
+      const local = await db.activity.get(d.day);
+      if (pendingKeys.has(d.day) && local && local.updatedAt > remoteTs) continue;
+      if (!local || local.updatedAt < remoteTs) {
+        const row: ActivityDay = { day: d.day, units: d.units, minutes: d.minutes, updatedAt: remoteTs };
+        await db.activity.put(row);
+      }
+      if (d.updated_at > mark) mark = d.updated_at;
+    }
   });
   setPulledMark(uid, mark);
 }
 
 /** После выхода: локальная копия и метка синхронизации очищаются, данные остаются в аккаунте. */
 export async function clearLocalAfterSignOut(uid: string): Promise<void> {
-  await db.transaction('rw', db.items, db.outbox, async () => {
+  await db.transaction('rw', db.items, db.outbox, db.activity, async () => {
     await db.items.clear();
     await db.outbox.clear();
+    await db.activity.clear();
   });
   try {
     localStorage.removeItem(PULL_MARK + uid);

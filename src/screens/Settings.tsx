@@ -1,12 +1,18 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import type { Session } from '@supabase/supabase-js';
 import { db, exportLibrary, importLibrary } from '../lib/db';
-import { useSession } from '../lib/supabase';
+import { goBack } from '../lib/router';
 import { AccountSection } from './Account';
 
-export function Settings() {
-  const session = useSession();
+export function Settings({ session }: { session: Session | null | undefined }) {
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goBack();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -36,11 +42,14 @@ export function Settings() {
   };
 
   return (
-    <>
-      <header className="topbar">
-        <h1>Настройки</h1>
+    <div className="detail" role="dialog" aria-modal="true">
+      <header className="detail-bar">
+        <button className="back" onClick={goBack} aria-label="Назад">
+          ‹ Назад
+        </button>
+        <span className="detail-kind">Настройки</span>
       </header>
-      <div className="content settings">
+      <div className="content settings detail-content">
         <AccountSection session={session} />
 
         <section className="block">
@@ -85,6 +94,6 @@ export function Settings() {
           сертифицирован TMDB.
         </p>
       </div>
-    </>
+    </div>
   );
 }
