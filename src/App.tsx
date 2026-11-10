@@ -7,6 +7,8 @@ import { Catalog } from './screens/Catalog';
 import { Library } from './screens/Library';
 import { Profile } from './screens/Profile';
 import { Settings } from './screens/Settings';
+import { Notes } from './screens/Notes';
+import { History } from './screens/History';
 import { Detail } from './screens/Detail';
 
 export default function App() {
@@ -14,7 +16,7 @@ export default function App() {
   const session = useSession();
   useSyncLifecycle(!!session);
 
-  const overlayOpen = route.detail !== null || route.settings;
+  const overlayOpen = route.detail !== null || route.overlay !== null;
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>
@@ -25,9 +27,11 @@ export default function App() {
   return (
     <div className="app">
       {screen('catalog', <Catalog />)}
-      {screen('library', <Library kindFromRoute={route.libraryKind} />)}
+      {screen('library', <Library kindFromRoute={route.libraryKind} favoritesFromRoute={route.libraryFavorites} />)}
       {screen('profile', <Profile session={session} />)}
-      {route.settings && <Settings session={session} />}
+      {route.overlay === 'settings' && <Settings session={session} />}
+      {route.overlay === 'notes' && <Notes />}
+      {route.overlay === 'history' && <History />}
       {route.detail && (
         <Detail
           key={itemKey(route.detail.mediaType, route.detail.id)}

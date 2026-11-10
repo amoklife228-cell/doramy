@@ -70,17 +70,30 @@ export function applyQuery(
   return filtered.sort(cmp[q.sort]);
 }
 
-export function Library({ kindFromRoute }: { kindFromRoute: LibraryKind | null }) {
+export function Library({
+  kindFromRoute,
+  favoritesFromRoute,
+}: {
+  kindFromRoute: LibraryKind | null;
+  favoritesFromRoute: boolean;
+}) {
   const all = useLiveQuery(() => db.items.toArray(), []) ?? [];
   const [kind, setKind] = useState<LibraryKind>(loadKind);
 
-  // Переход из профиля: #/library/<kind> открывает нужный раздел.
+  // Переход из профиля: #/library/<kind> открывает нужный раздел, #/library/favorites — избранное.
   useEffect(() => {
     if (kindFromRoute) {
       setKind(kindFromRoute);
       setStatus('');
+      setFavoritesOnly(false);
     }
   }, [kindFromRoute]);
+  useEffect(() => {
+    if (favoritesFromRoute) {
+      setStatus('');
+      setFavoritesOnly(true);
+    }
+  }, [favoritesFromRoute]);
   const [status, setStatus] = useState<WatchStatus | ''>('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');

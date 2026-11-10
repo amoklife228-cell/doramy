@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
+import { BottomSheet } from '../components/BottomSheet';
 import { Poster } from '../components/Poster';
 import { db } from '../lib/db';
 import { navigate, openDrama, openSettings } from '../lib/router';
-import { buildHeatmap, computeAchievements, computeStats, type Achievement } from '../lib/stats';
+import { buildHeatmap, computeAchievements, computeStats, type Achievement, type ProfileStats } from '../lib/stats';
 import { kindOf, LIBRARY_KINDS, type LibraryKind, type SavedDrama } from '../lib/types';
 
 export function Profile({ session }: { session: Session | null | undefined }) {
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
   const activity = useLiveQuery(() => db.activity.toArray(), []) ?? [];
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const stats = useMemo(() => computeStats(items, activity), [items, activity]);
   const weeks = useMemo(() => buildHeatmap(activity, 26), [activity]);
@@ -19,12 +21,18 @@ export function Profile({ session }: { session: Session | null | undefined }) {
   const name = email ? email.split('@')[0] : 'Гость';
   const initial = name.slice(0, 1).toUpperCase();
 
+  const notesCount = items.filter((s) => s.notes.trim().length > 0).length;
+  const go = (path: string) => {
+    setMenuOpen(false);
+    navigate(path);
+  };
+
   return (
     <>
       <header className="topbar profile-bar">
         <span className="profile-bar-spacer" />
         <h1 className="profile-name">{name}</h1>
-        <button className="icon-btn" onClick={openSettings} aria-label="Настройки">
+        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Меню">
           <svg viewBox="0 0 24 24" aria-hidden>
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
@@ -76,7 +84,77 @@ export function Profile({ session }: { session: Session | null | undefined }) {
           </div>
         </section>
       </div>
+
+      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню профиля">
+        <ProgressRows stats={stats} achievements={achievements} />
+        <ul className="menu">
+          <MenuItem title="Избранное" sub={`(${stats.favorites})`} onClick={() => go('/library/favorites')} icon={<HeartIcon />} />
+          <MenuItem title="Заметки" sub={`(${notesCount})`} onClick={() => go('/notes')} icon={<NoteIcon />} />
+          <MenuItem title="История просмотров" sub={`(${stats.days} ${plural(stats.days, 'день', 'дня', 'дней')})`} onClick={() => go('/history')} icon={<PlayIcon />} />
+          <MenuItem title="Настройки" onClick={() => go('/settings')} icon={<GearIcon />} />
+        </ul>
+      </BottomSheet>
     </>
+  );
+}
+
+/** Верх шторки: полоски прогресса в стиле панели лимитов. */
+function ProgressRows({ stats, achievements }: { stats: ProfileStats; achievements: Achievement[] }) {
+  const doramaDone = stats.byKind.dorama.completed;
+  const doramaTotal = stats.byKind.dorama.total;
+  const unlocked = achievements.filter((a) => a.unlocked).length;
+  const streakGoal = stats.streak >= 7 ? (stats.streak >= 30 ? 100 : 30) : 7;
+
+  const rows = [
+    {
+      title: 'Дорамы досмотрено',
+      value: doramaTotal ? doramaDone / doramaTotal : 0,
+      sub: doramaTotal ? `${doramaDone} из ${doramaTotal} в библиотеке` : 'Пока нет дорам в библиотеке',
+    },
+    {
+      title: 'Достижения',
+      value: unlocked / achievements.length,
+      sub: `${unlocked} из ${achievements.length} получено`,
+    },
+    {
+      title: 'Серия дней',
+      value: stats.streak / streakGoal,
+      sub: stats.streak ? `${stats.streak} из ${streakGoal} ${plural(streakGoal, 'дня', 'дней', 'дней')} подряд` : 'Посмотрите серию сегодня, чтобы начать',
+    },
+  ];
+
+  return (
+    <div className="prog">
+      {rows.map((r) => (
+        <div key={r.title} className="prog-row">
+          <div className="prog-head">
+            <span>{r.title}</span>
+            <span>{Math.round(Math.min(1, r.value) * 100)}%</span>
+          </div>
+          <div className="prog-bar">
+            <div className="prog-fill" style={{ width: `${Math.round(Math.min(1, r.value) * 100)}%` }} />
+          </div>
+          <div className="prog-sub">{r.sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MenuItem({ title, sub, onClick, icon }: { title: string; sub?: string; onClick: () => void; icon: React.ReactNode }) {
+  return (
+    <li>
+      <button className="menu-item" onClick={onClick}>
+        <span className="menu-icon">{icon}</span>
+        <span className="menu-text">
+          <span className="menu-title">{title}</span>
+          {sub && <span className="menu-sub">{sub}</span>}
+        </span>
+        <span className="chevron" aria-hidden>
+          ›
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -135,7 +213,6 @@ function KindSection({ kind, title, items }: { kind: LibraryKind; title: string;
   const list = (mode === 'completed' ? completed : planned).sort((a, b) => b.updatedAt - a.updatedAt);
 
   const emptyText = kind === 'movie' ? 'Нет фильмов' : kind === 'series' ? 'Нет сериалов' : 'Нет дорам';
-  const catalogTarget = kind === 'movie' ? '/catalog' : '/catalog';
 
   return (
     <section className="pblock">
@@ -158,7 +235,7 @@ function KindSection({ kind, title, items }: { kind: LibraryKind; title: string;
       {list.length === 0 ? (
         <div className="pblock-empty">
           <div className="empty-title">{emptyText}</div>
-          <button className="btn btn-light" onClick={() => navigate(catalogTarget)}>
+          <button className="btn btn-light" onClick={() => navigate('/catalog')}>
             Добавить
           </button>
         </div>
@@ -189,9 +266,7 @@ function AchievementCard({ a }: { a: Achievement }) {
         <div className="ach-wave" style={{ height: `${Math.max(12, Math.round(a.progress * 100))}%` }} />
       </div>
       <div className="ach-title">{a.title}</div>
-      <div className="ach-sub muted small">
-        {a.unlocked ? 'Получено' : `${a.current} / ${a.goal}`}
-      </div>
+      <div className="ach-sub muted small">{a.unlocked ? 'Получено' : `${a.current} / ${a.goal}`}</div>
     </div>
   );
 }
@@ -206,7 +281,42 @@ function GlassesIcon() {
   );
 }
 
-function plural(n: number, one: string, few: string, many: string): string {
+function HeartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.4-7 10-7 10z" />
+    </svg>
+  );
+}
+
+function NoteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M5 4h10l4 4v12H5z" />
+      <path d="M15 4v4h4M8 13h8M8 17h5" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5v7l5.5-3.5z" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    </svg>
+  );
+}
+
+export function plural(n: number, one: string, few: string, many: string): string {
   const m10 = n % 10;
   const m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return one;
