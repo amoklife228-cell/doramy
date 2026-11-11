@@ -2,21 +2,18 @@ import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { signIn, signOut, signUp, SYNC_AVAILABLE } from '../lib/supabase';
 import { clearLocalAfterSignOut, syncNow, useSyncState } from '../lib/sync';
+import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
 
 export function AccountSection({ session }: { session: Session | null | undefined }) {
   if (!SYNC_AVAILABLE) return null;
-  return (
-    <section className="block">
-      <h2>Аккаунт</h2>
-      {session === undefined ? (
-        <p className="muted">Проверяем вход…</p>
-      ) : session ? (
-        <SignedIn session={session} />
-      ) : (
-        <SignInForm />
-      )}
-    </section>
-  );
+  if (session === undefined) {
+    return (
+      <IosSection title="Аккаунт">
+        <IosRow icon={RowIcons.person} iconColor={IconColors.gray} label="Проверяем вход…" />
+      </IosSection>
+    );
+  }
+  return session ? <SignedIn session={session} /> : <SignInForm />;
 }
 
 function SignedIn({ session }: { session: Session }) {
@@ -30,41 +27,47 @@ function SignedIn({ session }: { session: Session }) {
     setConfirm(false);
   };
 
-  const when = sync.lastSync ? new Date(sync.lastSync).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : null;
+  const email = session.user.email ?? '';
+  const when = sync.lastSync
+    ? new Date(sync.lastSync).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const syncText =
+    sync.status === 'syncing'
+      ? 'Синхронизация…'
+      : sync.status === 'error'
+        ? `Ошибка: ${sync.error}`
+        : when
+          ? `Синхронизировано в ${when}`
+          : 'Готово к синхронизации';
 
   return (
     <>
-      <p className="muted">
-        Вы вошли как <strong>{session.user.email}</strong>. Библиотека хранится в аккаунте и доступна на любом
-        устройстве после входа.
-      </p>
-      <p className="muted small">
-        {sync.status === 'syncing' && 'Синхронизация…'}
-        {sync.status === 'idle' && (when ? `Синхронизировано в ${when}` : 'Готово к синхронизации')}
-        {sync.status === 'error' && `Ошибка синхронизации: ${sync.error}`}
-      </p>
-      <div className="status-buttons">
-        <button className="btn" onClick={() => void syncNow()} disabled={sync.status === 'syncing'}>
-          Синхронизировать
-        </button>
+      <IosSection title="Аккаунт" footer="Библиотека хранится в аккаунте и доступна на любом устройстве после входа.">
+        <IosRow
+          icon={<span className="ios-avatar">{email.slice(0, 1).toUpperCase() || '?'}</span>}
+          label={email}
+          sub={syncText}
+        />
+        <IosRow
+          icon={RowIcons.sync}
+          iconColor={IconColors.blue}
+          label="Синхронизировать"
+          disabled={sync.status === 'syncing'}
+          onClick={() => void syncNow()}
+        />
+      </IosSection>
+      <IosSection
+        footer={confirm ? 'После выхода библиотека на этом устройстве очистится. В аккаунте она останется.' : undefined}
+      >
         {confirm ? (
           <>
-            <button className="btn btn-danger" onClick={() => void onSignOut()}>
-              Да, выйти
-            </button>
-            <button className="btn" onClick={() => setConfirm(false)}>
-              Отмена
-            </button>
+            <IosRow label="Да, выйти" destructive center onClick={() => void onSignOut()} />
+            <IosRow label="Отмена" accent center onClick={() => setConfirm(false)} />
           </>
         ) : (
-          <button className="btn btn-danger-text" onClick={() => setConfirm(true)}>
-            Выйти
-          </button>
+          <IosRow label="Выйти" destructive center onClick={() => setConfirm(true)} />
         )}
-      </div>
-      {confirm && (
-        <p className="muted small">После выхода библиотека на этом устройстве очистится. В аккаунте она останется.</p>
-      )}
+      </IosSection>
     </>
   );
 }
@@ -91,55 +94,65 @@ function SignInForm() {
   const valid = email.includes('@') && password.length >= 6;
 
   return (
-    <>
-      <p className="muted">
-        Войдите, чтобы библиотека сохранялась в аккаунте и была одинаковой на телефоне, планшете и компьютере.
-        Без входа всё работает, но только на этом устройстве.
-      </p>
-      <form
-        className="authform"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(() => signIn(email, password));
-        }}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid && !busy) void run(() => signIn(email, password));
+      }}
+    >
+      <IosSection
+        title="Аккаунт"
+        footer={
+          message ??
+          'Войдите, чтобы библиотека сохранялась в аккаунте и была одинаковой на телефоне, планшете и компьютере. Без входа всё работает, но только на этом устройстве.'
+        }
       >
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          autoCapitalize="off"
-          autoCorrect="off"
-          inputMode="email"
+        <IosRow label="Email">
+          <input
+            className="ios-input"
+            type="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            inputMode="email"
+          />
+        </IosRow>
+        <IosRow label="Пароль">
+          <input
+            className="ios-input"
+            type="password"
+            placeholder="от 6 символов"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </IosRow>
+      </IosSection>
+      <IosSection>
+        <IosRow
+          label={busy ? 'Подождите…' : 'Войти'}
+          accent
+          center
+          disabled={busy || !valid}
+          onClick={() => void run(() => signIn(email, password))}
         />
-        <input
-          type="password"
-          placeholder="Пароль (от 6 символов)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
+        <IosRow
+          label="Создать аккаунт"
+          center
+          disabled={busy || !valid}
+          onClick={() =>
+            void run(async () => {
+              const r = await signUp(email, password);
+              return r === 'confirm_email' ? 'Проверьте почту и подтвердите email, затем войдите.' : undefined;
+            })
+          }
         />
-        <div className="status-buttons">
-          <button className="btn btn-primary" type="submit" disabled={busy || !valid}>
-            Войти
-          </button>
-          <button
-            className="btn"
-            type="button"
-            disabled={busy || !valid}
-            onClick={() =>
-              void run(async () => {
-                const r = await signUp(email, password);
-                return r === 'confirm_email' ? 'Проверьте почту и подтвердите email, затем войдите.' : undefined;
-              })
-            }
-          >
-            Создать аккаунт
-          </button>
-        </div>
-      </form>
-      {message && <p className="muted small">{message}</p>}
-    </>
+      </IosSection>
+      {/* Скрытая кнопка, чтобы Enter в поле отправлял форму */}
+      <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
+    </form>
   );
 }

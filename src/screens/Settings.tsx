@@ -13,68 +13,9 @@ import {
   TABBAR_GAP_RANGE,
   type Appearance,
 } from '../lib/appearance';
+import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
+import { plural } from './Profile';
 import { AccountSection } from './Account';
-
-function signed(n: number): string {
-  return n > 0 ? `+${n}` : `${n}`;
-}
-
-/** Раздел «Внешний вид»: поправки положения нижней панели, применяются сразу. */
-function AppearanceSection() {
-  const [a, setA] = useState<Appearance>(loadAppearance);
-
-  const update = (patch: Partial<Appearance>) => {
-    const next = { ...a, ...patch };
-    setA(next);
-    applyAppearance(next);
-    saveAppearance(next);
-  };
-
-  return (
-    <section className="block">
-      <h2>Внешний вид</h2>
-      <div className="tune">
-        <label className="tune-row">
-          <span className="tune-head">
-            <span>Поднять панель снизу</span>
-            <span className="tune-value">{signed(a.bottomOffset)} px</span>
-          </span>
-          <input
-            type="range"
-            min={BOTTOM_OFFSET_RANGE.min}
-            max={BOTTOM_OFFSET_RANGE.max}
-            step={BOTTOM_OFFSET_RANGE.step}
-            value={a.bottomOffset}
-            onChange={(e) => update({ bottomOffset: Number(e.target.value) })}
-          />
-          <p className="muted small tune-hint">
-            Если под панелью остаётся пустая полоса, сдвиньте влево (в минус). Если панель прижата к краю, вправо.
-          </p>
-        </label>
-        <label className="tune-row">
-          <span className="tune-head">
-            <span>Зазор панели от края</span>
-            <span className="tune-value">{a.tabbarGap} px</span>
-          </span>
-          <input
-            type="range"
-            min={TABBAR_GAP_RANGE.min}
-            max={TABBAR_GAP_RANGE.max}
-            step={TABBAR_GAP_RANGE.step}
-            value={a.tabbarGap}
-            onChange={(e) => update({ tabbarGap: Number(e.target.value) })}
-          />
-        </label>
-      </div>
-      <div className="status-buttons" style={{ marginTop: 10 }}>
-        <button className="btn" onClick={() => update({ ...DEFAULT_APPEARANCE })} disabled={isDefaultAppearance(a)}>
-          Сбросить
-        </button>
-      </div>
-      <p className="muted small">Настройка хранится только на этом устройстве.</p>
-    </section>
-  );
-}
 
 /** Строка для отладки: режим запуска, размеры окна и отступы безопасной зоны. */
 function diagnostics(): string {
@@ -99,6 +40,67 @@ function diagnostics(): string {
     .join(' · ');
 }
 
+function signed(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+/** Раздел «Внешний вид»: поправки положения нижней панели, применяются сразу. */
+function AppearanceSection() {
+  const [a, setA] = useState<Appearance>(loadAppearance);
+
+  const update = (patch: Partial<Appearance>) => {
+    const next = { ...a, ...patch };
+    setA(next);
+    applyAppearance(next);
+    saveAppearance(next);
+  };
+
+  return (
+    <IosSection
+      title="Внешний вид"
+      footer="Если под нижней панелью остаётся пустая полоса, сдвиньте первый ползунок влево. Настройка хранится только на этом устройстве."
+    >
+      <IosRow className="ios-row-stack">
+        <span className="ios-stack-head">
+          <span className="ios-row-label">Поднять панель снизу</span>
+          <span className="ios-row-value ios-value-accent">{signed(a.bottomOffset)} px</span>
+        </span>
+        <input
+          type="range"
+          aria-label="Поднять панель снизу"
+          min={BOTTOM_OFFSET_RANGE.min}
+          max={BOTTOM_OFFSET_RANGE.max}
+          step={BOTTOM_OFFSET_RANGE.step}
+          value={a.bottomOffset}
+          onChange={(e) => update({ bottomOffset: Number(e.target.value) })}
+        />
+      </IosRow>
+      <IosRow className="ios-row-stack">
+        <span className="ios-stack-head">
+          <span className="ios-row-label">Зазор панели от края</span>
+          <span className="ios-row-value ios-value-accent">{a.tabbarGap} px</span>
+        </span>
+        <input
+          type="range"
+          aria-label="Зазор панели от края"
+          min={TABBAR_GAP_RANGE.min}
+          max={TABBAR_GAP_RANGE.max}
+          step={TABBAR_GAP_RANGE.step}
+          value={a.tabbarGap}
+          onChange={(e) => update({ tabbarGap: Number(e.target.value) })}
+        />
+      </IosRow>
+      <IosRow
+        label="Сбросить"
+        accent
+        center
+        disabled={isDefaultAppearance(a)}
+        onClick={() => update({ ...DEFAULT_APPEARANCE })}
+      />
+    </IosSection>
+  );
+}
+
 export function Settings({ session }: { session: Session | null | undefined }) {
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
 
@@ -109,6 +111,12 @@ export function Settings({ session }: { session: Session | null | undefined }) {
   }, []);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [message]);
 
   const onExport = async () => {
     const json = await exportLibrary();
@@ -141,56 +149,84 @@ export function Settings({ session }: { session: Session | null | undefined }) {
         <button className="back" onClick={goBack} aria-label="Назад">
           ‹ Назад
         </button>
-        <span className="detail-kind">Настройки</span>
       </header>
-      <div className="content settings detail-content">
+      <div className="content detail-content ios-page">
+        <h1 className="ios-large-title">Настройки</h1>
+
         <AccountSection session={session} />
 
         <AppearanceSection />
 
-        <section className="block">
-          <h2>Резервная копия</h2>
-          <p className="muted">
-            Записей в библиотеке: {count}. Экспорт сохраняет всё в файл, импорт восстанавливает из него.
-            {session ? '' : ' Без аккаунта данные живут только на этом устройстве, так что копию стоит делать.'}
-          </p>
-          <div className="status-buttons">
-            <button className="btn" onClick={() => void onExport()} disabled={count === 0}>
-              Экспорт в файл
-            </button>
-            <button className="btn" onClick={() => fileInput.current?.click()}>
-              Импорт из файла
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(e) => void onImport(e.target.files?.[0])}
-            />
-          </div>
-        </section>
+        <IosSection
+          title="Резервная копия"
+          footer={
+            session
+              ? 'Копия пригодится, если захотите перенести библиотеку вручную.'
+              : 'Без аккаунта данные живут только на этом устройстве, так что копию стоит делать.'
+          }
+        >
+          <IosRow
+            icon={RowIcons.exportUp}
+            iconColor={IconColors.blue}
+            label="Экспорт в файл"
+            value={count ? `${count} ${plural(count, 'запись', 'записи', 'записей')}` : 'пусто'}
+            chevron
+            disabled={count === 0}
+            onClick={() => void onExport()}
+          />
+          <IosRow
+            icon={RowIcons.importDown}
+            iconColor={IconColors.green}
+            label="Импорт из файла"
+            chevron
+            onClick={() => fileInput.current?.click()}
+          />
+        </IosSection>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={(e) => void onImport(e.target.files?.[0])}
+        />
 
-        <section className="block">
-          <h2>Установить на iPhone</h2>
-          <ol className="steps">
-            <li>Откройте этот сайт в Safari.</li>
-            <li>Нажмите кнопку «Поделиться» внизу экрана (квадрат со стрелкой вверх).</li>
-            <li>Выберите «На экран “Домой”» и нажмите «Добавить».</li>
-          </ol>
-          <p className="muted small">
-            Приложение откроется без адресной строки, как обычное, и будет работать офлайн с уже загруженными данными.
-          </p>
-        </section>
+        <IosSection
+          title="Установка на iPhone"
+          footer="Приложение откроется без адресной строки, как обычное, и будет работать офлайн с уже загруженными данными."
+        >
+          <IosRow icon={<Step n={1} />} label="Откройте сайт в Safari" sub="Из других браузеров иконка откроет обычный сайт" />
+          <IosRow icon={<Step n={2} />} label="Нажмите «Поделиться»" sub="Квадрат со стрелкой вверх внизу экрана" />
+          <IosRow icon={<Step n={3} />} label="«На экран “Домой”» → «Добавить»" />
+        </IosSection>
+
+        <IosSection
+          title="О приложении"
+          footer={
+            <>
+              Данные о сериалах и фильмах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не
+              сертифицирован TMDB.
+              <br />
+              <span className="ios-diag">{diagnostics()}</span>
+            </>
+          }
+        >
+          <IosRow icon={RowIcons.film} iconColor={IconColors.gray} label="Источник данных" value="TMDB" />
+          <IosRow
+            icon={RowIcons.info}
+            iconColor={IconColors.orange}
+            label="Сайт приложения"
+            value="github.io"
+            chevron
+            onClick={() => window.open('https://amoklife228-cell.github.io/doramy/', '_blank', 'noopener')}
+          />
+        </IosSection>
 
         {message && <div className="toast">{message}</div>}
-
-        <p className="muted small credit">
-          Данные о сериалах и фильмах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не
-          сертифицирован TMDB.
-        </p>
-        <p className="muted small">{diagnostics()}</p>
       </div>
     </div>
   );
+}
+
+function Step({ n }: { n: number }) {
+  return <span className="ios-step">{n}</span>;
 }
