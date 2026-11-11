@@ -13,7 +13,9 @@
   --tabbar-h: 64px;
   --tabbar-gap: 10px;
   --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* --user-bottom задаёт пользователь в Настройках (Внешний вид), по умолчанию 0. */
+  --user-bottom: 0px;
+  --safe-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--user-bottom));
   color-scheme: dark;
 }
 
@@ -763,6 +765,48 @@ input[type='checkbox'] {
   margin: 0 0 10px;
   padding-left: 22px;
   line-height: 1.6;
+}
+
+/* Настройки → Внешний вид: ползунки поправок */
+.tune {
+  background: var(--bg-elev);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+}
+
+.tune-row {
+  display: block;
+  padding: 10px 0;
+}
+
+.tune-row + .tune-row {
+  border-top: 1px solid var(--bg-elev2);
+}
+
+.tune-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.tune-value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tune-row input[type='range'] {
+  display: block;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  touch-action: pan-x;
+}
+
+.tune-hint {
+  margin: 6px 0 0;
 }
 
 .toast {

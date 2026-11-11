@@ -3,7 +3,78 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { db, exportLibrary, importLibrary } from '../lib/db';
 import { goBack } from '../lib/router';
+import {
+  applyAppearance,
+  BOTTOM_OFFSET_RANGE,
+  DEFAULT_APPEARANCE,
+  isDefaultAppearance,
+  loadAppearance,
+  saveAppearance,
+  TABBAR_GAP_RANGE,
+  type Appearance,
+} from '../lib/appearance';
 import { AccountSection } from './Account';
+
+function signed(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+/** Раздел «Внешний вид»: поправки положения нижней панели, применяются сразу. */
+function AppearanceSection() {
+  const [a, setA] = useState<Appearance>(loadAppearance);
+
+  const update = (patch: Partial<Appearance>) => {
+    const next = { ...a, ...patch };
+    setA(next);
+    applyAppearance(next);
+    saveAppearance(next);
+  };
+
+  return (
+    <section className="block">
+      <h2>Внешний вид</h2>
+      <div className="tune">
+        <label className="tune-row">
+          <span className="tune-head">
+            <span>Поднять панель снизу</span>
+            <span className="tune-value">{signed(a.bottomOffset)} px</span>
+          </span>
+          <input
+            type="range"
+            min={BOTTOM_OFFSET_RANGE.min}
+            max={BOTTOM_OFFSET_RANGE.max}
+            step={BOTTOM_OFFSET_RANGE.step}
+            value={a.bottomOffset}
+            onChange={(e) => update({ bottomOffset: Number(e.target.value) })}
+          />
+          <p className="muted small tune-hint">
+            Если под панелью остаётся пустая полоса, сдвиньте влево (в минус). Если панель прижата к краю, вправо.
+          </p>
+        </label>
+        <label className="tune-row">
+          <span className="tune-head">
+            <span>Зазор панели от края</span>
+            <span className="tune-value">{a.tabbarGap} px</span>
+          </span>
+          <input
+            type="range"
+            min={TABBAR_GAP_RANGE.min}
+            max={TABBAR_GAP_RANGE.max}
+            step={TABBAR_GAP_RANGE.step}
+            value={a.tabbarGap}
+            onChange={(e) => update({ tabbarGap: Number(e.target.value) })}
+          />
+        </label>
+      </div>
+      <div className="status-buttons" style={{ marginTop: 10 }}>
+        <button className="btn" onClick={() => update({ ...DEFAULT_APPEARANCE })} disabled={isDefaultAppearance(a)}>
+          Сбросить
+        </button>
+      </div>
+      <p className="muted small">Настройка хранится только на этом устройстве.</p>
+    </section>
+  );
+}
 
 /** Строка для отладки: режим запуска, размеры окна и отступы безопасной зоны. */
 function diagnostics(): string {
@@ -74,6 +145,8 @@ export function Settings({ session }: { session: Session | null | undefined }) {
       </header>
       <div className="content settings detail-content">
         <AccountSection session={session} />
+
+        <AppearanceSection />
 
         <section className="block">
           <h2>Резервная копия</h2>
