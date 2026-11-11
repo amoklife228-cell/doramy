@@ -138,8 +138,8 @@ async function curatedPage(
   shuffled: boolean,
 ): Promise<Page<Drama>> {
   const ids = (shuffled ? shuffle(list) : list).map((x) => x.id);
-  const items = await detailsList(mediaType, ids, signal);
-  return { items, page: 1, totalPages: 1 };
+  const { items, partial } = await detailsList(mediaType, ids, signal);
+  return { items, page: 1, totalPages: 1, partial };
 }
 
 /* ---------- подборки ---------- */
@@ -187,7 +187,13 @@ export const COLLECTIONS: Record<CollectionId, Collection> = {
           1,
           signal,
         );
-        return { items: [...r.items, ...extra.items], page: 1, totalPages: 1 };
+        const have = new Set(r.items.map((d) => d.id));
+        return {
+          items: [...r.items, ...extra.items.filter((d) => !have.has(d.id))],
+          page: 1,
+          totalPages: 1,
+          partial: r.partial,
+        };
       }
       return r;
     },

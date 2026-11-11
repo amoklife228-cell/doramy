@@ -1,0 +1,135 @@
+/* Профиль: дополнения к правилам .profile* / .ach* / .prog-* из styles.css. */
+
+/* Меню в шторке: сгруппированный список iOS. Шторка сама цвета --bg-elev, поэтому строки на тон светлее. */
+.profile-menu {
+  margin-top: 14px;
+}
+
+.profile-menu .ios-section {
+  margin-top: 0;
+}
+
+.profile-menu .ios-list {
+  background: var(--bg-elev2);
+}
+
+.profile-menu .ios-row {
+  min-height: 50px;
+}
+
+.profile-menu button.ios-row:active:not(:disabled) {
+  background: #3a3a3c;
+}
+
+/* Заголовок раздела-ссылки: палец попадает в 44 px. */
+.profile .pblock-link {
+  min-height: 44px;
+}
+
+.pblock-chevron {
+  flex: none;
+  width: 9px;
+  height: 16px;
+  color: var(--muted);
+}
+
+/* «Войти» внутри текста: невидимое расширение зоны нажатия до 44 px. */
+.profile .link {
+  position: relative;
+}
+
+.profile .link::after {
+  content: '';
+  position: absolute;
+  inset: -12px -8px;
+}
+
+/* Карточка достижения — кнопка. */
+button.ach {
+  display: block;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  border-radius: 14px;
+  -webkit-touch-callout: none;
+}
+
+button.ach .ach-art {
+  transition: transform 0.15s ease;
+}
+
+button.ach:active .ach-art {
+  transform: scale(0.96);
+}
+
+button.ach:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Шторка достижения */
+.ach-detail {
+  padding: 4px 4px 8px;
+  text-align: center;
+}
+
+.ach-detail .ach {
+  width: 136px;
+  margin: 0 auto;
+}
+
+.ach-detail .ach-art {
+  height: 136px;
+  display: grid;
+  place-items: center;
+}
+
+.ach-detail-icon {
+  position: relative;
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  color: #fff;
+}
+
+.ach[data-unlocked='false'] .ach-detail-icon {
+  color: var(--muted);
+}
+
+.ach-detail-title {
+  margin: 16px 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ach-detail-desc {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.ach-detail-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(229, 32, 46, 0.16);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ach-detail-done svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ach-detail .prog-row {
+  text-align: left;
+}

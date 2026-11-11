@@ -19,6 +19,8 @@ export interface Page<T> {
   items: T[];
   page: number;
   totalPages: number;
+  /** Часть запросов не удалась: список неполный, долго не кэшировать. */
+  partial?: boolean;
 }
 
 export class TMDBError extends Error {
@@ -80,7 +82,76 @@ export function clearCredential() {
   window.dispatchEvent(new Event(CONFIG_EVENT));
 }
 
+/* ---------- ограничитель запросов ----------
+ * Главная каталога за секунду запрашивает подборки, кадры жанров, рекомендации и русские названия.
+ * TMDB режет больше ~40 запросов в секунду (429), поэтому одновременно идут не больше 8,
+ * а ответ 429 повторяется один раз после паузы из Retry-After.
+ */
+const MAX_IN_FLIGHT = 8;
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+
+function acquire(signal?: AbortSignal): Promise<void> {
+  if (inFlight < MAX_IN_FLIGHT) {
+    inFlight++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const start = () => {
+      signal?.removeEventListener('abort', onAbort);
+      inFlight++;
+      resolve();
+    };
+    const onAbort = () => {
+      const i = waiting.indexOf(start);
+      if (i >= 0) waiting.splice(i, 1);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    if (signal?.aborted) return onAbort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    waiting.push(start);
+  });
+}
+
+function release() {
+  inFlight--;
+  waiting.shift()?.();
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
+    );
+  });
+}
+
 async function fetchJSON<T>(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    await acquire(signal);
+    let result: { retryAfter: number } | { value: T };
+    try {
+      result = await fetchOnce<T>(path, params, signal);
+    } finally {
+      release();
+    }
+    if ('value' in result) return result.value;
+    if (attempt >= 1) throw new TMDBError('TMDB просит подождать. Попробуйте через минуту.', 429);
+    await sleep(result.retryAfter, signal);
+  }
+}
+
+async function fetchOnce<T>(
+  path: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<{ retryAfter: number } | { value: T }> {
   let token = safeGet(TOKEN_STORAGE);
   let apiKey = safeGet(KEY_STORAGE);
   if (!token && !apiKey) {
@@ -104,9 +175,13 @@ async function fetchJSON<T>(path: string, params: Record<string, string>, signal
     if ((e as Error).name === 'AbortError') throw e;
     throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
   }
+  if (response.status === 429) {
+    const header = Number(response.headers.get('Retry-After'));
+    return { retryAfter: Number.isFinite(header) && header > 0 ? Math.min(header, 5) * 1000 : 1000 };
+  }
   if (response.status === 401) throw new TMDBError('TMDB отклонил ключ. Проверьте его в «Настройках».', 401);
   if (!response.ok) throw new TMDBError(`Ошибка сервера TMDB (код ${response.status}).`, response.status);
-  return (await response.json()) as T;
+  return { value: (await response.json()) as T };
 }
 
 // Общий DTO для списков сериалов и фильмов: у сериалов name/first_air_date, у фильмов title/release_date.
@@ -153,15 +228,26 @@ interface DetailDTO extends ListItemDTO {
  */
 
 const CYRILLIC = /[А-Яа-яЁё]/;
-const TITLES_KEY = 'doramy.titles.v1';
+// v2: запись хранит время проверки. Английское или «лучше нет» перепроверяется через месяц —
+// вдруг зрители добавили русское название.
+const TITLES_KEY = 'doramy.titles.v2';
 const TITLES_LIMIT = 4000;
-let titleCache: Record<string, string> | null = null;
+const TITLE_RECHECK = 30 * 24 * 60 * 60 * 1000;
+type TitleEntry = { t: string; at: number };
+let titleCache: Record<string, TitleEntry> | null = null;
 let titleSaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Поиск названия, который уже идёт: другие списки ждут его, а не запрашивают то же самое. */
+const titleLookups = new Map<string, Promise<void>>();
 
-function titles(): Record<string, string> {
+function titles(): Record<string, TitleEntry> {
   if (!titleCache) {
     try {
-      titleCache = JSON.parse(localStorage.getItem(TITLES_KEY) ?? '{}') as Record<string, string>;
+      titleCache = JSON.parse(localStorage.getItem(TITLES_KEY) ?? '{}') as Record<string, TitleEntry>;
+      try {
+        localStorage.removeItem('doramy.titles.v1');
+      } catch {
+        // ignore
+      }
     } catch {
       titleCache = {};
     }
@@ -169,9 +255,21 @@ function titles(): Record<string, string> {
   return titleCache;
 }
 
+/** Найденное название по ключу (пустая строка — искали, лучше нет). */
+function knownTitle(key: string): string | undefined {
+  return titles()[key]?.t;
+}
+
+/** Нужно ли (снова) искать название: не искали, или нашли не русское и прошёл месяц. */
+function titleIsStale(key: string): boolean {
+  const e = titles()[key];
+  if (!e) return true;
+  return needsRussianTitle(e.t) && Date.now() - e.at > TITLE_RECHECK;
+}
+
 function rememberTitle(key: string, title: string) {
   const cache = titles();
-  cache[key] = title;
+  cache[key] = { t: title, at: Date.now() };
   if (titleSaveTimer) clearTimeout(titleSaveTimer);
   titleSaveTimer = setTimeout(() => {
     try {
@@ -213,40 +311,46 @@ function pickTitle(d: TitlesDTO): string | null {
   return enName || null;
 }
 
-async function mapLimit<T, R>(list: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(list.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < list.length) {
-      const i = next++;
-      out[i] = await fn(list[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
-  return out;
+
+/** Один поиск названия; общий для всех списков, поэтому не привязан к чьему-то signal. */
+function lookupTitle(mediaType: MediaType, id: number): Promise<void> {
+  const key = itemKey(mediaType, id);
+  let p = titleLookups.get(key);
+  if (!p) {
+    p = fetchJSON<TitlesDTO>(`/${mediaType}/${id}`, { append_to_response: 'alternative_titles,translations' })
+      .then((r) => rememberTitle(key, pickTitle(r) ?? '')) // '' = искали, лучше нет
+      .catch(() => undefined) // сбой сети или 429: не запоминаем, попробуем в другой раз
+      .finally(() => titleLookups.delete(key));
+    titleLookups.set(key, p);
+  }
+  return p;
 }
 
-/** Подставить русские (или хотя бы английские) названия там, где TMDB отдал оригинал. */
-export async function localizeTitles(items: Drama[], signal?: AbortSignal): Promise<Drama[]> {
-  const cache = titles();
-  const missing = items.filter((d) => needsRussianTitle(d.title) && cache[itemKey(d.mediaType, d.id)] === undefined);
+/**
+ * Подставить русские (или хотя бы английские) названия там, где TMDB отдал оригинал.
+ * `limit` — сколько названий искать за раз: для ленты хватит видимых, для сетки — страницы.
+ */
+export async function localizeTitles(items: Drama[], signal?: AbortSignal, limit = 20): Promise<Drama[]> {
+  const missing = items
+    .filter((d) => needsRussianTitle(d.title) && titleIsStale(itemKey(d.mediaType, d.id)))
+    .slice(0, limit);
   if (missing.length) {
-    await mapLimit(missing.slice(0, 30), 6, async (d) => {
-      try {
-        const r = await fetchJSON<TitlesDTO>(
-          `/${d.mediaType}/${d.id}`,
-          { append_to_response: 'alternative_titles,translations' },
-          signal,
-        );
-        // Пустая строка = искали, лучше нет; повторно не ищем.
-        rememberTitle(itemKey(d.mediaType, d.id), pickTitle(r) ?? '');
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') throw e;
-      }
-    });
+    const all = Promise.all(missing.map((d) => lookupTitle(d.mediaType, d.id)));
+    if (signal) {
+      // Ушли с экрана — не ждём, но поиск доработает и пригодится в следующий раз.
+      await Promise.race([
+        all,
+        new Promise<void>((_, reject) => {
+          if (signal.aborted) reject(new DOMException('Aborted', 'AbortError'));
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        }),
+      ]);
+    } else {
+      await all;
+    }
   }
   return items.map((d) => {
-    const better = cache[itemKey(d.mediaType, d.id)];
+    const better = knownTitle(itemKey(d.mediaType, d.id));
     return better && needsRussianTitle(d.title) ? { ...d, title: better } : d;
   });
 }
@@ -254,7 +358,7 @@ export async function localizeTitles(items: Drama[], signal?: AbortSignal): Prom
 function toDrama(mediaType: MediaType, d: ListItemDTO): Drama {
   const fromApi = d.name || d.title || d.original_name || d.original_title || 'Без названия';
   // Уже найденное русское название подставляем сразу, без запроса.
-  const known = needsRussianTitle(fromApi) ? titles()[itemKey(mediaType, d.id)] : undefined;
+  const known = needsRussianTitle(fromApi) ? knownTitle(itemKey(mediaType, d.id)) : undefined;
   const title = known || fromApi;
   const langCountry = d.original_language ? LANG_TO_COUNTRY[d.original_language] : undefined;
   const countries = d.origin_country?.length ? d.origin_country : langCountry ? [langCountry] : [];
@@ -339,12 +443,16 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   return { items, page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
-/** discover по Азии с произвольными параметрами TMDB (для подборок на главной). */
+/**
+ * discover по Азии с произвольными параметрами TMDB (для подборок на главной).
+ * `localize`: сколько русских названий искать (0 — не искать, например когда нужны только кадры).
+ */
 export async function discoverAsia(
   mediaType: MediaType,
   extra: Record<string, string>,
   page: number,
   signal?: AbortSignal,
+  localize = 20,
 ): Promise<Page<Drama>> {
   const params: Record<string, string> = {
     page: String(page),
@@ -354,7 +462,8 @@ export async function discoverAsia(
   };
   if (mediaType === 'tv') params.include_null_first_air_dates = 'false';
   const r = await fetchJSON<ListResponse>(`/discover/${mediaType}`, params, signal);
-  const items = await localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+  const raw = r.results.map((d) => toDrama(mediaType, d));
+  const items = localize > 0 ? await localizeTitles(raw, signal, localize) : raw;
   return { items, page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
@@ -379,6 +488,7 @@ export async function trendingAsia(
   );
   const ok = responses.filter((r): r is ListResponse => r !== null);
   if (ok.length === 0) throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
+  const partial = ok.length < responses.length;
   const items = await localizeTitles(
     ok
       .flatMap((r) => r.results)
@@ -388,11 +498,18 @@ export async function trendingAsia(
     signal,
   );
   const total = Math.max(...ok.map((r) => r.total_pages));
-  return { items, page, totalPages: Math.min(Math.ceil(total / 3), 10) };
+  return { items, page, totalPages: Math.min(Math.ceil(total / 3), 10), partial };
 }
 
-/** Карточки по списку id (подборки редакции и премий): из кэша, остальное — запросом. Порядок сохраняется. */
-export async function detailsList(mediaType: MediaType, ids: number[], signal?: AbortSignal): Promise<Drama[]> {
+/**
+ * Карточки по списку id (подборки редакции и премий): из кэша, остальное — запросом. Порядок сохраняется.
+ * `partial` — часть не загрузилась (сеть, 429): такой список не стоит кэшировать надолго.
+ */
+export async function detailsList(
+  mediaType: MediaType,
+  ids: number[],
+  signal?: AbortSignal,
+): Promise<{ items: Drama[]; partial: boolean }> {
   const results = await Promise.all(
     ids.map((id) => {
       const cached = dramaCache.get(itemKey(mediaType, id));
@@ -410,7 +527,7 @@ export async function detailsList(mediaType: MediaType, ids: number[], signal?: 
   );
   const items = results.filter((d): d is Drama => d !== null);
   if (items.length === 0 && ids.length > 0) throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
-  return items;
+  return { items, partial: items.length < ids.length };
 }
 
 /** Поиск по названию. TMDB не фильтрует поиск по стране, поэтому отсеиваем на клиенте. */
@@ -511,6 +628,59 @@ export async function recommendations(
   const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: String(page) }, signal);
   if (r.results.length === 0 && page > 1) return recommendations(mediaType, id, signal, 1);
   return localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+}
+
+export interface CastMember {
+  id: number;
+  name: string;
+  character: string;
+  profilePath: string | null;
+}
+
+interface CreditsDTO {
+  cast?: {
+    id: number;
+    name: string;
+    character?: string;
+    profile_path?: string | null;
+    roles?: { character?: string }[];
+    order?: number;
+  }[];
+}
+
+/** Актёры: у сериалов — по всем сезонам (aggregate_credits), у фильмов — обычные credits. Первые 15. */
+export async function credits(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<CastMember[]> {
+  const path = mediaType === 'tv' ? `/tv/${id}/aggregate_credits` : `/movie/${id}/credits`;
+  const r = await fetchJSON<CreditsDTO>(path, {}, signal);
+  return (r.cast ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+    .slice(0, 15)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      character: (c.character || c.roles?.[0]?.character || '').trim(),
+      profilePath: c.profile_path ?? null,
+    }));
+}
+
+export function profileUrl(path: string | null): string | null {
+  return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+}
+
+/** Похожие: рекомендации TMDB, а если их нет — «similar» (по жанрам и ключевым словам). */
+export async function similarTo(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Drama[]> {
+  let list = await recommendations(mediaType, id, signal);
+  // Мало рекомендаций или мало азиатских среди них — добираем из «similar».
+  if (list.length < 4 || list.filter(isAsian).length < 6) {
+    const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/similar`, { page: '1' }, signal);
+    const extra = await localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+    const seen = new Set(list.map((d) => d.id));
+    list = [...list, ...extra.filter((d) => !seen.has(d.id))];
+  }
+  // Приложение про азиатское: если азиатских похожих хватает, западные не показываем.
+  const asian = list.filter(isAsian);
+  return asian.length >= 5 ? asian : [...asian, ...list.filter((d) => !isAsian(d))];
 }
 
 /** Случайная популярная запись: случайная страница из первых 15 (но не дальше последней) и случайный элемент на ней. */

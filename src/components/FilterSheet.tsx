@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   CATEGORY_OPTIONS,
@@ -15,6 +15,9 @@ import {
   type MediaType,
   type Option,
 } from '../lib/types';
+import { IosRow, IosSection } from './IosList';
+import { BackButton } from './NavBar';
+import './FilterSheet.css';
 
 type Key = keyof CatalogFilters;
 
@@ -24,29 +27,45 @@ interface Row {
   options: Option[];
 }
 
-function rowsFor(mediaType: MediaType): Row[] {
-  const rows: Row[] = [
-    { key: 'sort', title: 'Сортировка', options: SORTS.map((s) => ({ value: s.id, label: s.title })) },
-    { key: 'genre', title: 'Жанр', options: [{ value: '', label: 'Любой' }, ...GENRES_BY_TYPE[mediaType].map((g) => ({ value: String(g.id), label: g.title }))] },
-    { key: 'year', title: 'Год выхода', options: YEAR_OPTIONS },
-    {
-      key: 'country',
-      title: 'Страна',
-      options: [{ value: '', label: 'Азия' }, { value: WORLD, label: 'Весь мир' }, ...COUNTRIES.map((c) => ({ value: c.code, label: c.title }))],
-    },
-    { key: 'status', title: 'Статус', options: STATUS_OPTIONS[mediaType] },
-  ];
-  if (mediaType === 'tv') rows.push({ key: 'category', title: 'Категория', options: CATEGORY_OPTIONS });
-  rows.push({ key: 'mine', title: mediaType === 'tv' ? 'Мои сериалы' : 'Мои фильмы', options: MINE_OPTIONS });
-  if (mediaType === 'tv') rows.push({ key: 'network', title: 'Телеканалы', options: NETWORK_OPTIONS });
-  return rows;
+/** Строки фильтра, сгруппированные по секциям как в «Настройках». */
+function groupsFor(mediaType: MediaType): Row[][] {
+  const tv = mediaType === 'tv';
+  const sort: Row = { key: 'sort', title: 'Сортировка', options: SORTS.map((s) => ({ value: s.id, label: s.title })) };
+  const genre: Row = {
+    key: 'genre',
+    title: 'Жанр',
+    options: [{ value: '', label: 'Любой' }, ...GENRES_BY_TYPE[mediaType].map((g) => ({ value: String(g.id), label: g.title }))],
+  };
+  const year: Row = { key: 'year', title: 'Год выхода', options: YEAR_OPTIONS };
+  const country: Row = {
+    key: 'country',
+    title: 'Страна',
+    options: [{ value: '', label: 'Азия' }, { value: WORLD, label: 'Весь мир' }, ...COUNTRIES.map((c) => ({ value: c.code, label: c.title }))],
+  };
+  const status: Row = { key: 'status', title: 'Статус', options: STATUS_OPTIONS[mediaType] };
+  const mine: Row = { key: 'mine', title: tv ? 'Мои сериалы' : 'Мои фильмы', options: MINE_OPTIONS };
+
+  const release: Row[] = [status];
+  if (tv) {
+    release.push({ key: 'category', title: 'Категория', options: CATEGORY_OPTIONS });
+    release.push({ key: 'network', title: 'Телеканалы', options: NETWORK_OPTIONS });
+  }
+  return [[sort], [genre, year, country], release, [mine]];
 }
 
 export function countActive(f: CatalogFilters): number {
   return (Object.keys(DEFAULT_FILTERS) as Key[]).filter((k) => f[k] !== DEFAULT_FILTERS[k]).length;
 }
 
-/** Полноэкранный фильтр каталога в стиле списка настроек: строки → выбор значения. */
+function Checkmark() {
+  return (
+    <svg className="fs-check" viewBox="0 0 16 13" fill="none" aria-hidden="true">
+      <path d="M1.5 7l4.5 4.5L14.5 1.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Фильтр каталога: шторка iOS со сгруппированным списком, строка → список значений. */
 export function FilterSheet({
   open,
   mediaType,
@@ -62,6 +81,9 @@ export function FilterSheet({
 }) {
   const [draft, setDraft] = useState<CatalogFilters>(value);
   const [level, setLevel] = useState<Key | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -69,6 +91,17 @@ export function FilterSheet({
       setLevel(null);
     }
   }, [open, value]);
+
+  // Фокус в диалог при открытии — для VoiceOver и клавиатуры.
+  useEffect(() => {
+    if (open) sheetRef.current?.focus();
+  }, [open]);
+
+  // Каждый уровень начинается с начала списка.
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    setScrolled(false);
+  }, [level]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,76 +116,87 @@ export function FilterSheet({
 
   if (!open) return null;
 
-  const rows = rowsFor(mediaType);
-  const current = level ? rows.find((r) => r.key === level) : null;
+  const groups = groupsFor(mediaType);
+  const current = level ? groups.flat().find((r) => r.key === level) ?? null : null;
   const labelOf = (row: Row) => row.options.find((o) => o.value === draft[row.key])?.label ?? '';
+  const apply = () => {
+    onApply(draft);
+    onClose();
+  };
 
   return createPortal(
-    <div className="filter" role="dialog" aria-modal="true" aria-label="Фильтр">
-      <header className="filter-bar">
-        {current ? (
-          <button className="back" onClick={() => setLevel(null)} aria-label="Назад к фильтру">
-            ‹ Фильтр
-          </button>
-        ) : (
-          <button className="filter-clear" onClick={() => setDraft(DEFAULT_FILTERS)} disabled={countActive(draft) === 0}>
-            Очистить
-          </button>
-        )}
-        <span className="filter-title">{current ? current.title : 'Фильтр'}</span>
-        <button
-          className="filter-ok"
-          onClick={() => {
-            onApply(draft);
-            onClose();
-          }}
-          aria-label="Применить"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden>
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-        </button>
-      </header>
+    <div className="fs-backdrop" onClick={onClose}>
+      <div
+        ref={sheetRef}
+        className="fs-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={current ? current.title : 'Фильтр'}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="fs-bar" data-scrolled={scrolled}>
+          <div className="fs-side">
+            {current ? (
+              <BackButton label="Фильтр" onClick={() => setLevel(null)} />
+            ) : (
+              <button
+                type="button"
+                className="fs-action"
+                onClick={() => setDraft(DEFAULT_FILTERS)}
+                disabled={countActive(draft) === 0}
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
+          <h2 className="fs-title">{current ? current.title : 'Фильтр'}</h2>
+          <div className="fs-side fs-side-right">
+            <button type="button" className="fs-action fs-action-done" onClick={apply}>
+              Готово
+            </button>
+          </div>
+        </header>
 
-      <div className="filter-body">
-        {current ? (
-          <ul className="filter-list">
-            {current.options.map((o) => (
-              <li key={o.value}>
-                <button
-                  className="filter-row"
-                  data-active={draft[current.key] === o.value}
-                  onClick={() => {
-                    setDraft({ ...draft, [current.key]: o.value });
-                    setLevel(null);
-                  }}
-                >
-                  <span>{o.label}</span>
-                  {draft[current.key] === o.value && <span className="filter-check">✓</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <ul className="filter-list">
-            {rows.map((row) => {
-              const isDefault = draft[row.key] === DEFAULT_FILTERS[row.key];
-              return (
-                <li key={row.key}>
-                  <button className="filter-row" onClick={() => setLevel(row.key)}>
-                    <span>{row.title}</span>
-                    <span className="filter-value" data-set={!isDefault}>
-                      {isDefault && row.key !== 'sort' && row.key !== 'country' ? '' : labelOf(row)}
-                      <span className="chevron" aria-hidden>
-                        ›
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <div ref={bodyRef} className="fs-body" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}>
+          {current ? (
+            <div className="fs-level" key={current.key}>
+              <IosSection>
+                {current.options.map((o) => {
+                  const selected = draft[current.key] === o.value;
+                  return (
+                    <IosRow
+                      key={o.value}
+                      label={o.label}
+                      className={selected ? 'fs-option is-selected' : 'fs-option'}
+                      onClick={() => {
+                        setDraft({ ...draft, [current.key]: o.value });
+                        setLevel(null);
+                      }}
+                    >
+                      {selected && (
+                        <>
+                          <Checkmark />
+                          <span className="fs-sr">выбрано</span>
+                        </>
+                      )}
+                    </IosRow>
+                  );
+                })}
+              </IosSection>
+            </div>
+          ) : (
+            <div className="fs-level" key="root">
+              {groups.map((rows) => (
+                <IosSection key={rows[0].key}>
+                  {rows.map((row) => (
+                    <IosRow key={row.key} label={row.title} value={labelOf(row)} chevron onClick={() => setLevel(row.key)} />
+                  ))}
+                </IosSection>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

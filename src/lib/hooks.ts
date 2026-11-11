@@ -21,11 +21,12 @@ export function useInfiniteScroll(onVisible: () => void, enabled: boolean) {
   useEffect(() => {
     const el = ref.current;
     if (!el || !enabled) return;
+    // root — ближайший прокручиваемый .content, чтобы запас в 400px работал внутри прокрутки.
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) callback.current();
       },
-      { rootMargin: '400px' },
+      { root: el.closest('.content'), rootMargin: '400px' },
     );
     observer.observe(el);
     return () => observer.disconnect();

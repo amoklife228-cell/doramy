@@ -7,7 +7,7 @@ import { Poster } from './Poster';
 
 const STRIP_COUNT = 15;
 const STRIP_TTL = 30 * 60 * 1000;
-const stripCache = new Map<string, { items: Drama[]; at: number }>();
+const stripCache = new Map<string, { items: Drama[]; at: number; ttl: number }>();
 
 /**
  * Горизонтальная лента подборки на главной каталога: заголовок с «Все ›» и постеры.
@@ -36,8 +36,10 @@ export function CollectionStrip({
   useEffect(() => {
     const el = ref.current;
     if (!el || visible) return;
+    // root — прокручиваемый .content: иначе запас rootMargin считается от окна и не работает внутри прокрутки.
     const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && setVisible(true), {
-      rootMargin: '300px 0px',
+      root: el.closest('.content'),
+      rootMargin: '400px 0px',
     });
     io.observe(el);
     return () => io.disconnect();
@@ -48,7 +50,7 @@ export function CollectionStrip({
     const forced = lastRefresh.current !== refreshKey;
     lastRefresh.current = refreshKey;
     const cached = stripCache.get(cacheKey);
-    if (cached && !forced && attempt === 0 && Date.now() - cached.at < STRIP_TTL) {
+    if (cached && !forced && attempt === 0 && Date.now() - cached.at < cached.ttl) {
       setItems(cached.items);
       return;
     }
@@ -60,7 +62,8 @@ export function CollectionStrip({
       .then((r) => {
         const list = r.items.slice(0, STRIP_COUNT);
         remember(list);
-        stripCache.set(cacheKey, { items: list, at: Date.now() });
+        // Неполный список (часть запросов не прошла) держим минуту, а не полчаса.
+        stripCache.set(cacheKey, { items: list, at: Date.now(), ttl: r.partial ? 60_000 : STRIP_TTL });
         setItems(list);
       })
       .catch((e: Error) => {

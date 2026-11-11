@@ -1,0 +1,172 @@
+/* Фильтр каталога: шторка iOS (крупная) со сгруппированным списком. */
+
+.fs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+  animation: fade-in 0.2s ease-out;
+}
+
+.fs-sheet {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 560px;
+  margin: calc(var(--safe-top) + 10px) auto 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  outline: none;
+  animation: sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Шапка шторки: «Сбросить» / «‹ Фильтр» — заголовок — «Готово». */
+.fs-bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 56px;
+  padding: 6px 8px;
+  border-bottom: 0.5px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.fs-bar[data-scrolled='true'] {
+  border-bottom-color: rgba(84, 84, 88, 0.6);
+}
+
+.fs-side {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.fs-side-right {
+  justify-content: flex-end;
+}
+
+.fs-title {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fs-action {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.fs-action-done {
+  font-weight: 600;
+}
+
+.fs-action:active:not(:disabled) {
+  opacity: 0.6;
+}
+
+.fs-action:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Список с собственной прокруткой. */
+.fs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px calc(var(--safe-bottom) + 16px);
+}
+
+.fs-level {
+  animation: fs-level-in 0.2s ease-out;
+}
+
+@keyframes fs-level-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fs-body .ios-section:first-child {
+  margin-top: 8px;
+}
+
+.fs-body .ios-section {
+  margin-top: 20px;
+}
+
+/* На подложке шторки (#1c1c1e) карточки на тон светлее, как в системных шторках. */
+.fs-sheet .ios-list {
+  background: var(--bg-elev2);
+  border-radius: 10px;
+}
+
+.fs-sheet button.ios-row:active:not(:disabled) {
+  background: #3a3a3c;
+}
+
+.fs-sheet .ios-row {
+  min-height: 44px;
+}
+
+.fs-sheet .ios-row-value {
+  max-width: 55%;
+}
+
+.fs-sheet .ios-chevron {
+  color: #6e6e73;
+}
+
+/* Галочка выбранного значения. */
+.fs-check {
+  flex: none;
+  width: 16px;
+  height: 13px;
+  color: var(--accent);
+}
+
+.fs-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-backdrop,
+  .fs-sheet,
+  .fs-level {
+    animation: none;
+  }
+}

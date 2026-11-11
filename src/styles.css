@@ -2067,6 +2067,187 @@ code {
   line-height: 1.4;
 }
 
+/* «Продолжить смотреть» на главной каталога */
+.continue {
+  margin-top: 4px;
+  margin-bottom: 24px;
+}
+
+.continue-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 12px 0 2px;
+}
+
+.continue-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.continue-card {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(300px, 82vw);
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+}
+
+.continue-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: inherit;
+}
+
+.continue-poster {
+  flex: none;
+  width: 54px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.continue-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.continue-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.continue-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.continue-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-elev2);
+  overflow: hidden;
+}
+
+.continue-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.continue-plus {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.continue-plus:disabled {
+  background: var(--bg-elev2);
+  color: var(--muted);
+}
+
+.continue-plus:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* «В ролях» в карточке */
+.cast-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 4px;
+}
+
+.cast-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.cast-item {
+  flex: none;
+  width: 84px;
+  text-align: center;
+}
+
+.cast-photo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-elev);
+}
+
+.cast-photo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.cast-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cast-role {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Кнопка-иконка в шапке вложенного экрана (Поделиться) */
+.nav-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+}
+
+.nav-icon-btn svg {
+  width: 23px;
+  height: 23px;
+}
+
+.nav-icon-btn:active {
+  opacity: 0.5;
+}
+
 /* Пока подбирается новая подборка, старая чуть приглушена */
 .rec-strip[data-loading='true'] {
   opacity: 0.5;

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { CastStrip, ShareButton, SimilarStrip } from '../components/DetailExtras';
 import { Poster } from '../components/Poster';
 import { TrailerBlock } from '../components/TrailerBlock';
 import { EmptyState, NotConfigured } from '../components/DramaGrid';
@@ -63,6 +64,9 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const libraryKeyList = useLiveQuery(() => db.items.toCollection().primaryKeys(), []);
+  const libraryKeys = useMemo(() => new Set((libraryKeyList ?? []) as string[]), [libraryKeyList]);
+
   const isMovie = mediaType === 'movie';
   const country = drama ? countryOf(drama.originCountries) : undefined;
   const airStatus = drama ? localizedAirStatus(drama.airStatus, mediaType) : null;
@@ -70,7 +74,7 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
 
   return (
     <div className="detail" role="dialog" aria-modal="true">
-      <NavBar title={isMovie ? 'Фильм' : 'Сериал'} />
+      <NavBar title={isMovie ? 'Фильм' : 'Сериал'} right={<ShareButton drama={drama} />} />
 
       {!drama ? (
         <div className="content">
@@ -117,6 +121,9 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
               <p className="overview">{drama.overview}</p>
             </section>
           )}
+
+          <CastStrip mediaType={mediaType} id={id} enabled={configured} />
+          <SimilarStrip mediaType={mediaType} id={id} enabled={configured} libraryKeys={libraryKeys} />
 
           <IosSection
             title="Информация"

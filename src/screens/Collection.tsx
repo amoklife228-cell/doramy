@@ -55,7 +55,8 @@ export function Collection({ mediaType, id }: { mediaType: MediaType; id: string
             ) : (
               <DramaGrid
                 items={list.items}
-                loading={list.loading || (list.items.length === 0 && list.hasMore)}
+                loading={list.loading}
+                placeholder={list.items.length === 0 && list.hasMore}
                 hasMore={list.hasMore}
                 onLoadMore={list.loadMore}
                 error={list.error}

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { BottomSheet } from '../components/BottomSheet';
+import { IconColors, IosRow, IosSection } from '../components/IosList';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
@@ -9,15 +10,20 @@ import { navigate, openDrama, openSettings } from '../lib/router';
 import { syncNow } from '../lib/sync';
 import { buildHeatmap, computeAchievements, computeStats, type Achievement, type ProfileStats } from '../lib/stats';
 import { kindOf, LIBRARY_KINDS, type LibraryKind, type SavedDrama } from '../lib/types';
+import './Profile.css';
 
 export function Profile({ session }: { session: Session | null | undefined }) {
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
   const activity = useLiveQuery(() => db.activity.toArray(), []) ?? [];
   const [menuOpen, setMenuOpen] = useState(false);
+  // id держим и после закрытия, чтобы шторка не опустела во время анимации ухода.
+  const [achId, setAchId] = useState<string | null>(null);
+  const [achOpen, setAchOpen] = useState(false);
 
   const stats = useMemo(() => computeStats(items, activity), [items, activity]);
   const weeks = useMemo(() => buildHeatmap(activity, 26), [activity]);
   const achievements = useMemo(() => computeAchievements(stats), [stats]);
+  const selectedAch = achievements.find((a) => a.id === achId) ?? null;
 
   const email = session?.user.email ?? null;
   const name = email ? email.split('@')[0] : 'Гость';
@@ -28,13 +34,17 @@ export function Profile({ session }: { session: Session | null | undefined }) {
     setMenuOpen(false);
     navigate(path);
   };
+  const openAch = (id: string) => {
+    setAchId(id);
+    setAchOpen(true);
+  };
 
   return (
     <>
       <header className="topbar profile-bar">
         <span className="profile-bar-spacer" />
         <h1 className="profile-name">{name}</h1>
-        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Меню">
+        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Меню" aria-haspopup="dialog">
           <svg viewBox="0 0 24 24" aria-hidden>
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
@@ -81,7 +91,7 @@ export function Profile({ session }: { session: Session | null | undefined }) {
           </div>
           <div className="achievements">
             {achievements.map((a) => (
-              <AchievementCard key={a.id} a={a} />
+              <AchievementCard key={a.id} a={a} onOpen={() => openAch(a.id)} />
             ))}
           </div>
         </section>
@@ -89,12 +99,39 @@ export function Profile({ session }: { session: Session | null | undefined }) {
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} label="Меню профиля">
         <ProgressRows stats={stats} achievements={achievements} />
-        <ul className="menu">
-          <MenuItem title="Избранное" sub={`(${stats.favorites})`} onClick={() => go('/library/favorites')} icon={<HeartIcon />} />
-          <MenuItem title="Заметки" sub={`(${notesCount})`} onClick={() => go('/notes')} icon={<NoteIcon />} />
-          <MenuItem title="История просмотров" sub={`(${stats.days} ${plural(stats.days, 'день', 'дня', 'дней')})`} onClick={() => go('/history')} icon={<PlayIcon />} />
-          <MenuItem title="Настройки" onClick={() => go('/settings')} icon={<GearIcon />} />
-        </ul>
+        <div className="profile-menu">
+          <IosSection>
+            <IosRow
+              icon={MenuIcons.heart}
+              iconColor={IconColors.red}
+              label="Избранное"
+              value={String(stats.favorites)}
+              chevron
+              onClick={() => go('/library/favorites')}
+            />
+            <IosRow
+              icon={MenuIcons.note}
+              iconColor={IconColors.orange}
+              label="Заметки"
+              value={String(notesCount)}
+              chevron
+              onClick={() => go('/notes')}
+            />
+            <IosRow
+              icon={MenuIcons.history}
+              iconColor={IconColors.blue}
+              label="История просмотров"
+              value={`${stats.days} ${plural(stats.days, 'день', 'дня', 'дней')}`}
+              chevron
+              onClick={() => go('/history')}
+            />
+            <IosRow icon={MenuIcons.gear} iconColor={IconColors.gray} label="Настройки" chevron onClick={() => go('/settings')} />
+          </IosSection>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={achOpen && !!selectedAch} onClose={() => setAchOpen(false)} label={selectedAch?.title ?? 'Достижение'}>
+        {selectedAch && <AchievementDetail a={selectedAch} />}
       </BottomSheet>
     </>
   );
@@ -140,23 +177,6 @@ function ProgressRows({ stats, achievements }: { stats: ProfileStats; achievemen
         </div>
       ))}
     </div>
-  );
-}
-
-function MenuItem({ title, sub, onClick, icon }: { title: string; sub?: string; onClick: () => void; icon: React.ReactNode }) {
-  return (
-    <li>
-      <button className="menu-item" onClick={onClick}>
-        <span className="menu-icon">{icon}</span>
-        <span className="menu-text">
-          <span className="menu-title">{title}</span>
-          {sub && <span className="menu-sub">{sub}</span>}
-        </span>
-        <span className="chevron" aria-hidden>
-          ›
-        </span>
-      </button>
-    </li>
   );
 }
 
@@ -207,68 +227,153 @@ function Heatmap({ weeks }: { weeks: ReturnType<typeof buildHeatmap> }) {
   );
 }
 
+type KindMode = 'completed' | 'planned';
+const KIND_MODES: { id: KindMode; label: string }[] = [
+  { id: 'completed', label: 'Посмотрел' },
+  { id: 'planned', label: 'Буду смотреть' },
+];
+
 function KindSection({ kind, title, items }: { kind: LibraryKind; title: string; items: SavedDrama[] }) {
-  const [mode, setMode] = useState<'completed' | 'planned'>('completed');
+  const [mode, setMode] = useState<KindMode>('completed');
+  const uid = useId();
   const mine = useMemo(() => items.filter((s) => kindOf(s) === kind), [items, kind]);
   const completed = mine.filter((s) => s.status === 'completed');
   const planned = mine.filter((s) => s.status === 'planned');
+  const counts: Record<KindMode, number> = { completed: completed.length, planned: planned.length };
   const list = (mode === 'completed' ? completed : planned).sort((a, b) => b.updatedAt - a.updatedAt);
 
   const emptyText = kind === 'movie' ? 'Нет фильмов' : kind === 'series' ? 'Нет сериалов' : 'Нет дорам';
+  const tabId = (m: KindMode) => `${uid}-tab-${m}`;
+  const panelId = `${uid}-panel`;
+
+  // Стрелки влево/вправо переключают вкладки, как у системного сегмент-контрола.
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next: KindMode = mode === 'completed' ? 'planned' : 'completed';
+    setMode(next);
+    document.getElementById(tabId(next))?.focus();
+  };
 
   return (
     <section className="pblock">
-      <button className="pblock-head pblock-link" onClick={() => navigate(`/library/${kind}`)}>
+      <button className="pblock-head pblock-link" onClick={() => navigate(`/library/${kind}`)} aria-label={`${title}: открыть все`}>
         <h2>{title}</h2>
-        <span className="chevron" aria-hidden>
-          ›
-        </span>
+        <ChevronIcon />
       </button>
-      <div className="segmented segmented-wide">
-        <button data-active={mode === 'completed'} onClick={() => setMode('completed')}>
-          <span className="seg-num">{completed.length}</span>
-          <span className="seg-label">Посмотрел</span>
-        </button>
-        <button data-active={mode === 'planned'} onClick={() => setMode('planned')}>
-          <span className="seg-num">{planned.length}</span>
-          <span className="seg-label">Буду смотреть</span>
-        </button>
-      </div>
-      {list.length === 0 ? (
-        <div className="pblock-empty">
-          <div className="empty-title">{emptyText}</div>
-          <button className="btn btn-light" onClick={() => navigate('/catalog')}>
-            Добавить
+      <div className="segmented segmented-wide" role="tablist" aria-label={title}>
+        {KIND_MODES.map((m) => (
+          <button
+            key={m.id}
+            id={tabId(m.id)}
+            type="button"
+            role="tab"
+            aria-selected={mode === m.id}
+            aria-controls={panelId}
+            tabIndex={mode === m.id ? 0 : -1}
+            data-active={mode === m.id}
+            onClick={() => setMode(m.id)}
+            onKeyDown={onTabKey}
+          >
+            <span className="seg-num">{counts[m.id]}</span>
+            <span className="seg-label">{m.label}</span>
           </button>
-        </div>
-      ) : (
-        <div className="strip">
-          {list.slice(0, 12).map((s) => (
-            <button key={s.key} className="strip-item" onClick={() => openDrama(s.mediaType, s.tmdbId)}>
-              <Poster path={s.posterPath} alt={s.title} size="w342" className="strip-poster" />
-              <span className="strip-title">{s.title}</span>
+        ))}
+      </div>
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId(mode)}>
+        {list.length === 0 ? (
+          <div className="pblock-empty">
+            <div className="empty-title">{emptyText}</div>
+            <button className="btn btn-light" onClick={() => navigate('/catalog')}>
+              Добавить
             </button>
-          ))}
-          {list.length > 12 && (
-            <button className="strip-item strip-more" onClick={() => navigate(`/library/${kind}`)}>
-              <span className="strip-poster strip-more-box">+{list.length - 12}</span>
-              <span className="strip-title">Все</span>
-            </button>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="strip">
+            {list.slice(0, 12).map((s) => (
+              <button key={s.key} className="strip-item" onClick={() => openDrama(s.mediaType, s.tmdbId)}>
+                <Poster path={s.posterPath} alt={s.title} size="w342" className="strip-poster" />
+                <span className="strip-title">{s.title}</span>
+              </button>
+            ))}
+            {list.length > 12 && (
+              <button
+                className="strip-item strip-more"
+                onClick={() => navigate(`/library/${kind}`)}
+                aria-label={`Все: ещё ${list.length - 12}`}
+              >
+                <span className="strip-poster strip-more-box">+{list.length - 12}</span>
+                <span className="strip-title">Все</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-function AchievementCard({ a }: { a: Achievement }) {
+function achStatus(a: Achievement): string {
+  return a.unlocked ? 'Получено' : `${a.current} / ${a.goal}`;
+}
+
+function AchievementCard({ a, onOpen }: { a: Achievement; onOpen: () => void }) {
   return (
-    <div className="ach" data-unlocked={a.unlocked} title={a.description}>
-      <div className="ach-art">
+    <button
+      type="button"
+      className="ach"
+      data-unlocked={a.unlocked}
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      aria-label={`${a.title}. ${a.unlocked ? 'Получено' : `Прогресс ${a.current} из ${a.goal}`}`}
+    >
+      <div className="ach-art" aria-hidden>
         <div className="ach-wave" style={{ height: `${Math.max(12, Math.round(a.progress * 100))}%` }} />
       </div>
       <div className="ach-title">{a.title}</div>
-      <div className="ach-sub muted small">{a.unlocked ? 'Получено' : `${a.current} / ${a.goal}`}</div>
+      <div className="ach-sub muted small">{achStatus(a)}</div>
+    </button>
+  );
+}
+
+function AchievementDetail({ a }: { a: Achievement }) {
+  const pct = Math.round(a.progress * 100);
+  return (
+    <div className="ach-detail">
+      <div className="ach" data-unlocked={a.unlocked} aria-hidden>
+        <div className="ach-art">
+          <div className="ach-wave" style={{ height: `${Math.max(12, pct)}%` }} />
+          {a.unlocked ? <MedalIcon /> : <LockIcon />}
+        </div>
+      </div>
+      <h2 className="ach-detail-title">{a.title}</h2>
+      <p className="ach-detail-desc">{a.description}</p>
+      {a.unlocked ? (
+        <div className="ach-detail-done">
+          <CheckIcon />
+          Получено
+        </div>
+      ) : (
+        <div className="prog-row">
+          <div className="prog-head">
+            <span>Прогресс</span>
+            <span>{pct}%</span>
+          </div>
+          <div
+            className="prog-bar"
+            role="progressbar"
+            aria-label="Прогресс достижения"
+            aria-valuemin={0}
+            aria-valuemax={a.goal}
+            aria-valuenow={Math.min(a.current, a.goal)}
+          >
+            <div className="prog-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="prog-sub">
+            {Math.min(a.current, a.goal)} из {a.goal}. Осталось {a.goal - Math.min(a.current, a.goal)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -283,37 +388,70 @@ function GlassesIcon() {
   );
 }
 
-function HeartIcon() {
+function ChevronIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.4-7 10-7 10z" />
+    <svg className="pblock-chevron" viewBox="0 0 9 16" fill="none" aria-hidden>
+      <path d="M1.5 1.5L7.5 8l-6 6.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function NoteIcon() {
-  return (
+/* Однотонные белые иконки на цветном квадрате (как RowIcons в IosList). */
+const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+
+const MenuIcons = {
+  heart: (
     <svg viewBox="0 0 24 24" aria-hidden>
-      <path d="M5 4h10l4 4v12H5z" />
-      <path d="M15 4v4h4M8 13h8M8 17h5" />
+      <path
+        d="M12 20.3s-7.8-4.7-7.8-10.6A4.4 4.4 0 0 1 12 6.9a4.4 4.4 0 0 1 7.8 2.8c0 5.9-7.8 10.6-7.8 10.6z"
+        fill="currentColor"
+      />
+    </svg>
+  ),
+  note: (
+    <svg viewBox="0 0 24 24" aria-hidden {...stroke}>
+      <path d="M6 3.5h8.5L19 8v12.5H6z" />
+      <path d="M14 3.5V8h5M9 12.5h6.5M9 16h4.5" />
+    </svg>
+  ),
+  history: (
+    <svg viewBox="0 0 24 24" aria-hidden {...stroke}>
+      <path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8" />
+      <path d="M3.5 3.8v4h4" />
+      <path d="M12 8v4.3l2.9 1.8" />
+    </svg>
+  ),
+  gear: (
+    <svg viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={1.7}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+};
+
+function MedalIcon() {
+  return (
+    <svg className="ach-detail-icon" viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={1.6}>
+      <path d="M8 3h8l-1.5 5h-5z" />
+      <circle cx="12" cy="14.5" r="6" />
+      <path d="M12 11.6l.9 1.9 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" />
     </svg>
   );
 }
 
-function PlayIcon() {
+function LockIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M10 8.5v7l5.5-3.5z" />
+    <svg className="ach-detail-icon" viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={1.6}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2" />
     </svg>
   );
 }
 
-function GearIcon() {
+function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    <svg viewBox="0 0 24 24" aria-hidden {...stroke} strokeWidth={2.2}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );
 }

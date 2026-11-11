@@ -1,0 +1,184 @@
+import { useEffect, useState } from 'react';
+import { openDrama } from '../lib/router';
+import { credits, profileUrl, remember, similarTo, type CastMember } from '../lib/tmdb';
+import { itemKey, yearOf, type Drama, type MediaType } from '../lib/types';
+import { Poster } from './Poster';
+
+/* Дополнительные блоки карточки: «В ролях», «Похожие» и кнопка «Поделиться». */
+
+const castCache = new Map<string, CastMember[]>();
+const similarCache = new Map<string, Drama[]>();
+
+function useLoaded<T>(
+  cache: Map<string, T>,
+  key: string,
+  enabled: boolean,
+  load: (signal: AbortSignal) => Promise<T>,
+): T | null | undefined {
+  // undefined = грузится, null = не удалось
+  const [value, setValue] = useState<T | null | undefined>(() => cache.get(key));
+  useEffect(() => {
+    if (!enabled) return;
+    const cached = cache.get(key);
+    if (cached) {
+      setValue(cached);
+      return;
+    }
+    setValue(undefined);
+    const controller = new AbortController();
+    load(controller.signal)
+      .then((v) => {
+        cache.set(key, v);
+        setValue(v);
+      })
+      .catch((e: Error) => {
+        if (e.name !== 'AbortError') setValue(null);
+      });
+    return () => controller.abort();
+    // load пересоздаётся на каждый рендер; перезапрос нужен только при смене ключа
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, enabled]);
+  return value;
+}
+
+export function CastStrip({ mediaType, id, enabled }: { mediaType: MediaType; id: number; enabled: boolean }) {
+  const cast = useLoaded(castCache, itemKey(mediaType, id), enabled, (s) => credits(mediaType, id, s));
+  if (cast === null || (cast && cast.length === 0)) return null;
+  return (
+    <section className="block">
+      <h2>В ролях</h2>
+      <div className="cast-strip">
+        {cast === undefined
+          ? Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="cast-item" aria-hidden="true">
+                <div className="cast-photo skeleton" />
+                <div className="skeleton skeleton-line" style={{ width: '80%' }} />
+              </div>
+            ))
+          : cast.map((c) => {
+              const src = profileUrl(c.profilePath);
+              return (
+                <div key={c.id} className="cast-item">
+                  {src ? (
+                    <img className="cast-photo" src={src} alt="" loading="lazy" decoding="async" draggable={false} />
+                  ) : (
+                    <div className="cast-photo cast-photo-empty" aria-hidden="true">
+                      {initials(c.name)}
+                    </div>
+                  )}
+                  <div className="cast-name">{c.name}</div>
+                  {c.character && <div className="cast-role">{c.character}</div>}
+                </div>
+              );
+            })}
+      </div>
+    </section>
+  );
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+export function SimilarStrip({
+  mediaType,
+  id,
+  enabled,
+  libraryKeys,
+}: {
+  mediaType: MediaType;
+  id: number;
+  enabled: boolean;
+  libraryKeys: Set<string>;
+}) {
+  const list = useLoaded(similarCache, itemKey(mediaType, id), enabled, async (s) => {
+    const items = (await similarTo(mediaType, id, s)).slice(0, 15);
+    remember(items);
+    return items;
+  });
+  if (list === null) return null;
+  const shown = (list ?? []).filter((d) => !libraryKeys.has(itemKey(d.mediaType, d.id)));
+  if (list && shown.length === 0) return null;
+  return (
+    <section className="block">
+      <h2>{mediaType === 'movie' ? 'Похожие фильмы' : 'Похожие сериалы'}</h2>
+      <div className="strip">
+        {list === undefined
+          ? Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="strip-item" aria-hidden="true">
+                <div className="strip-poster skeleton" />
+                <div className="skeleton skeleton-line" style={{ width: '80%' }} />
+              </div>
+            ))
+          : shown.map((d) => (
+              <button key={itemKey(d.mediaType, d.id)} className="strip-item" onClick={() => openDrama(d.mediaType, d.id)}>
+                <span className="strip-poster-wrap">
+                  <Poster path={d.posterPath} alt={d.title} size="w342" className="strip-poster" />
+                  {d.voteAverage > 0 && <span className="badge">★ {d.voteAverage.toFixed(1)}</span>}
+                </span>
+                <span className="strip-title">{d.title}</span>
+                <span className="strip-year">{yearOf(d.firstAirDate) ?? ''}</span>
+              </button>
+            ))}
+      </div>
+    </section>
+  );
+}
+
+const APP_URL = 'https://amoklife228-cell.github.io/doramy/';
+
+/** Кнопка «Поделиться» в шапке: системное меню iOS, а без него — копирование ссылки. */
+export function ShareButton({ drama }: { drama: Drama | null }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+  if (!drama) return null;
+
+  const onShare = async () => {
+    const url = `${APP_URL}#/${drama.mediaType}/${drama.id}`;
+    const year = yearOf(drama.firstAirDate);
+    const text = `${drama.title}${year ? ` (${year})` : ''}${drama.voteAverage > 0 ? `, ★ ${drama.voteAverage.toFixed(1)}` : ''}. Смотри в «Дорамах»:`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: drama.title, text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      setCopied(true);
+    } catch (e) {
+      // Пользователь закрыл меню «Поделиться» — это не ошибка.
+      if ((e as Error).name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(`${text} ${url}`);
+          setCopied(true);
+        } catch {
+          // буфер обмена недоступен: ничего не делаем
+        }
+      }
+    }
+  };
+
+  return (
+    <>
+      <button type="button" className="nav-icon-btn" onClick={() => void onShare()} aria-label="Поделиться">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 15V3.5M12 3.5L8 7.5M12 3.5l4 4" />
+          <path d="M8 10.5H6.5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H16" />
+        </svg>
+      </button>
+      {copied && (
+        <div className="toast" role="status">
+          Ссылка скопирована
+        </div>
+      )}
+    </>
+  );
+}

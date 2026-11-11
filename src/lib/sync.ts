@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { db, setChangeListener, type OutboxOp } from './db';
-import { supabase } from './supabase';
+import { getSupabase, SYNC_AVAILABLE } from './supabase';
 import type { ActivityDay, MediaType, SavedDrama } from './types';
 
 // Каждое локальное изменение библиотеки попадает в очередь отправки.
 setChangeListener((key, op) => {
-  if (supabase) void enqueue(key, op);
+  if (SYNC_AVAILABLE) void enqueue(key, op);
 });
 
 /* ---------- состояние для UI ---------- */
@@ -120,8 +120,11 @@ export function syncNow(): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  if (!supabase) return;
+  if (!SYNC_AVAILABLE) return;
   const myEpoch = epoch;
+  // Чанк Supabase не загрузился (нет сети и кэша) — пропускаем круг, следующий запуск попробует снова.
+  const supabase = await getSupabase().catch(() => null);
+  if (!supabase) return;
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user.id;
   if (!uid || myEpoch !== epoch) return;
@@ -159,6 +162,7 @@ function unsynced(d: ActivityDay): boolean {
 }
 
 async function push(uid: string, myEpoch: number): Promise<void> {
+  const supabase = await getSupabase();
   if (!supabase) return;
   const pending = await db.outbox.toArray();
   if (pending.length === 0) return;
@@ -266,6 +270,7 @@ function sinceFor(mark: string): string {
 }
 
 async function pull(uid: string, myEpoch: number): Promise<void> {
+  const supabase = await getSupabase();
   if (!supabase) return;
   const libMark = getLS(LIB_MARK + uid);
   // Старые версии хранили одну метку на обе таблицы.
@@ -380,7 +385,7 @@ export async function signOutAndClear(uid: string, signOut: () => Promise<void>)
 /** Запускать синхронизацию при входе, возвращении на вкладку и раз в пару минут. */
 export function useSyncLifecycle(loggedIn: boolean) {
   useEffect(() => {
-    if (!loggedIn || !supabase) return;
+    if (!loggedIn || !SYNC_AVAILABLE) return;
     void syncNow();
     const onVisible = () => document.visibilityState === 'visible' && void syncNow();
     document.addEventListener('visibilitychange', onVisible);

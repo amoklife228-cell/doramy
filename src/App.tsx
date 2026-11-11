@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useRoute, type Route, type Tab } from './lib/router';
 import { useSession } from './lib/supabase';
 import { useSyncLifecycle } from './lib/sync';
@@ -8,11 +8,16 @@ import { Catalog } from './screens/Catalog';
 import { Library } from './screens/Library';
 import { Feed } from './screens/Feed';
 import { Profile } from './screens/Profile';
-import { Settings } from './screens/Settings';
-import { Notes } from './screens/Notes';
-import { History } from './screens/History';
-import { Detail } from './screens/Detail';
-import { Collection } from './screens/Collection';
+
+// Оверлеи открываются не сразу, поэтому грузятся отдельными чанками (вкладки остаются в основном).
+const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
+const Notes = lazy(() => import('./screens/Notes').then((m) => ({ default: m.Notes })));
+const History = lazy(() => import('./screens/History').then((m) => ({ default: m.History })));
+const Detail = lazy(() => import('./screens/Detail').then((m) => ({ default: m.Detail })));
+const Collection = lazy(() => import('./screens/Collection').then((m) => ({ default: m.Collection })));
+
+/** Пока чанк оверлея грузится — пустой чёрный экран того же слоя, без белой вспышки. */
+const overlayFallback = <div className="detail" />;
 
 export default function App() {
   const route = useRoute();
@@ -41,22 +46,38 @@ export default function App() {
       {screen('library', <Library kindFromRoute={route.libraryKind} favoritesFromRoute={route.libraryFavorites} />)}
       {screen('feed', <Feed active={route.tab === 'feed'} />)}
       {screen('profile', <Profile session={session} />)}
-      {route.overlay === 'settings' && <Settings session={session} />}
-      {route.overlay === 'notes' && <Notes />}
-      {route.overlay === 'history' && <History />}
+      {route.overlay === 'settings' && (
+        <Suspense fallback={overlayFallback}>
+          <Settings session={session} />
+        </Suspense>
+      )}
+      {route.overlay === 'notes' && (
+        <Suspense fallback={overlayFallback}>
+          <Notes />
+        </Suspense>
+      )}
+      {route.overlay === 'history' && (
+        <Suspense fallback={overlayFallback}>
+          <History />
+        </Suspense>
+      )}
       {collection && (
-        <Collection
-          key={`${collection.mediaType}:${collection.id}`}
-          mediaType={collection.mediaType}
-          id={collection.id}
-        />
+        <Suspense fallback={overlayFallback}>
+          <Collection
+            key={`${collection.mediaType}:${collection.id}`}
+            mediaType={collection.mediaType}
+            id={collection.id}
+          />
+        </Suspense>
       )}
       {route.detail && (
-        <Detail
-          key={itemKey(route.detail.mediaType, route.detail.id)}
-          mediaType={route.detail.mediaType}
-          id={route.detail.id}
-        />
+        <Suspense fallback={overlayFallback}>
+          <Detail
+            key={itemKey(route.detail.mediaType, route.detail.id)}
+            mediaType={route.detail.mediaType}
+            id={route.detail.id}
+          />
+        </Suspense>
       )}
       <TabBar active={route.tab} hidden={overlayOpen} />
     </div>

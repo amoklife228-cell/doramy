@@ -43,6 +43,7 @@ export function DramaGrid({
   onRetry,
   ranked = false,
   notes,
+  placeholder = false,
 }: {
   items: Drama[];
   loading: boolean;
@@ -53,9 +54,14 @@ export function DramaGrid({
   onRetry?: () => void;
   ranked?: boolean;
   notes?: Map<string, string>;
+  /**
+   * Показывать заготовки карточек, хотя запрос не идёт: страница целиком отсеялась фильтром,
+   * а сторож сейчас догрузит следующую. Влияет только на вид, не на догрузку.
+   */
+  placeholder?: boolean;
 }) {
   const sentinel = useInfiniteScroll(onLoadMore, hasMore && !loading);
-  const firstLoad = loading && items.length === 0;
+  const firstLoad = (loading || placeholder) && items.length === 0;
   return (
     <>
       <div className="grid">

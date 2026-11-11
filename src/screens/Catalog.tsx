@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
 import { CollectionStrip } from '../components/CollectionStrip';
+import { ContinueWatching } from '../components/ContinueWatching';
 import { countActive, FilterSheet } from '../components/FilterSheet';
 import { HOME_BOTTOM, HOME_TOP } from '../lib/collections';
 import { InstallHint } from '../components/InstallHint';
@@ -268,7 +269,8 @@ export function Catalog() {
               // тогда сторож сетки сам подгрузит следующие (не больше 5 подряд, см. условие выше).
               <DramaGrid
                 items={shown}
-                loading={list.loading || (shown.length === 0 && list.hasMore)}
+                loading={list.loading}
+                placeholder={shown.length === 0 && list.hasMore}
                 hasMore={list.hasMore}
                 onLoadMore={list.loadMore}
                 error={list.error}
@@ -325,7 +327,10 @@ function MultiChips({
 const REC_COUNT = 12;
 const REC_TTL = 20 * 60 * 1000;
 const SHOWN_LIMIT = 48;
-const recCache = new Map<MediaType, { items: Drama[]; title: string; at: number; personal: boolean }>();
+const recCache = new Map<
+  MediaType,
+  { items: Drama[]; title: string; at: number; personal: boolean; triedPersonal: boolean }
+>();
 
 function shuffle<T>(list: T[]): T[] {
   const a = [...list];
@@ -409,7 +414,6 @@ async function buildRecs(
     items = [...items, ...extra];
   }
 
-  rememberShown(mediaType, items.map((d) => itemKey(d.mediaType, d.id)));
   const isPersonal = personal.length > 0;
   return { items, title: isPersonal ? 'Рекомендации для тебя' : 'Популярное сейчас', personal: isPersonal };
 }
@@ -448,22 +452,28 @@ function CatalogHome({
     (force: boolean) => {
       if (!configured) return;
       const cached = recCache.get(mediaType);
+      // Личные рекомендации уже пробовали (даже если TMDB ничего не дал) — не перестраиваем на каждом шаге.
       const stale =
-        !cached || Date.now() - cached.at > REC_TTL || (latest.current.hasAnchors && !cached.personal);
+        !cached || Date.now() - cached.at > REC_TTL || (latest.current.hasAnchors && !cached.triedPersonal);
       if (cached && !force && !stale) {
         setRecs(cached);
         return;
       }
-      if (cached) setRecs(cached);
+      // Без кэша этого типа — пусто, чтобы на «Фильмах» не висели сериалы, пока грузится своё.
+      setRecs(cached ?? null);
       controller.current?.abort();
       const c = new AbortController();
       controller.current = c;
       setLoading(true);
+      const triedPersonal = latest.current.hasAnchors;
       buildRecs(mediaType, latest.current.anchors, latest.current.libraryKeys, c.signal)
         .then((r) => {
           if (c.signal.aborted) return;
+          // Офлайн или сбой: пустой ответ не затирает прежнюю подборку.
+          if (r.items.length === 0 && cached) return;
+          rememberShown(mediaType, r.items.map((d) => itemKey(d.mediaType, d.id)));
           remember(r.items);
-          const entry = { ...r, at: Date.now() };
+          const entry = { ...r, triedPersonal, at: Date.now() };
           recCache.set(mediaType, entry);
           setRecs(entry);
         })
@@ -507,6 +517,8 @@ function CatalogHome({
 
   return (
     <div className="home">
+      {mediaType === 'tv' && <ContinueWatching library={library} />}
+
       <div className="genre-cards">
         {GENRE_CARDS[mediaType].map((g) => (
           <GenreCard
@@ -649,7 +661,10 @@ function writeGenreArt(mediaType: MediaType, art: GenreArt) {
   }
 }
 
-async function loadGenreArt(mediaType: MediaType, signal: AbortSignal): Promise<GenreArt> {
+async function loadGenreArt(
+  mediaType: MediaType,
+  signal: AbortSignal,
+): Promise<{ art: GenreArt; complete: boolean }> {
   const cards = GENRE_CARDS[mediaType];
   const lists = await Promise.all(
     cards.map((g) =>
@@ -664,6 +679,7 @@ async function loadGenreArt(mediaType: MediaType, signal: AbortSignal): Promise<
         },
         1,
         signal,
+        0, // нужны только кадры, русские названия не ищем
       ).catch((e: Error) => {
         if (e.name === 'AbortError') throw e;
         return null;
@@ -680,7 +696,7 @@ async function loadGenreArt(mediaType: MediaType, signal: AbortSignal): Promise<
       art[g.id] = pick.backdropPath;
     }
   });
-  return art;
+  return { art, complete: lists.every((l) => l !== null) };
 }
 
 function useGenreArt(mediaType: MediaType, enabled: boolean): GenreArt {
@@ -691,9 +707,10 @@ function useGenreArt(mediaType: MediaType, enabled: boolean): GenreArt {
     if (cached || !enabled) return;
     const controller = new AbortController();
     loadGenreArt(mediaType, controller.signal)
-      .then((a) => {
+      .then(({ art: a, complete }) => {
         if (Object.keys(a).length === 0) return;
-        writeGenreArt(mediaType, a);
+        // Неполный набор (часть запросов не прошла) показываем, но не запоминаем на неделю.
+        if (complete) writeGenreArt(mediaType, a);
         setArt(a);
       })
       .catch(() => undefined);

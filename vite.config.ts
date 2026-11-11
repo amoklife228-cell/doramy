@@ -2,8 +2,27 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+/** Библиотеки в отдельных чанках: меняются редко, поэтому кэш переживает обновления кода приложения. */
+function vendorChunk(id: string): string | undefined {
+  const m = /[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/.exec(id);
+  if (!m) return undefined;
+  const pkg = m[1].replace(/\\/g, '/');
+  if (pkg === 'react' || pkg === 'react-dom' || pkg === 'scheduler') return 'react';
+  if (pkg === 'dexie' || pkg === 'dexie-react-hooks') return 'dexie';
+  // Грузится только динамически (lib/supabase.ts), чанк остаётся ленивым.
+  if (pkg.startsWith('@supabase/')) return 'supabase';
+  return undefined;
+}
+
 export default defineConfig({
   base: '/doramy/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: vendorChunk,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

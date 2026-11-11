@@ -4,9 +4,11 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { applyAppearance, loadAppearance } from './lib/appearance';
 import { fixLibraryTitles } from './lib/db';
+import { installEdgeSwipe } from './lib/edgeSwipe';
 import './styles.css';
 
 applyAppearance(loadAppearance());
+installEdgeSwipe();
 // iOS возвращает приложение с экрана «Домой» из памяти без перезагрузки, и браузер сам
 // не проверяет новую версию. Проверяем при каждом возвращении в приложение и раз в час.
 registerSW({
