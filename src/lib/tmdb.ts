@@ -310,9 +310,15 @@ export async function videos(mediaType: MediaType, id: number, signal?: AbortSig
     .map((v) => ({ key: v.key, name: v.name, type: v.type, lang: v.iso_639_1 ?? '', official: !!v.official }));
 }
 
-/** Похожие по мнению TMDB: первая страница рекомендаций к конкретному сериалу или фильму. */
-export async function recommendations(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Drama[]> {
-  const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: '1' }, signal);
+/** Похожие по мнению TMDB: страница рекомендаций к конкретному сериалу или фильму (если её нет — первая). */
+export async function recommendations(
+  mediaType: MediaType,
+  id: number,
+  signal?: AbortSignal,
+  page = 1,
+): Promise<Drama[]> {
+  const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: String(page) }, signal);
+  if (r.results.length === 0 && page > 1) return recommendations(mediaType, id, signal, 1);
   return r.results.map((d) => toDrama(mediaType, d));
 }
 

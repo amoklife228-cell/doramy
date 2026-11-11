@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
 import { countActive, FilterSheet } from '../components/FilterSheet';
@@ -221,10 +221,7 @@ export function Catalog() {
       <Refreshable
         onRefresh={() => {
           if (resultsMode) list.reload();
-          else {
-            recCache.delete(mediaType);
-            setHomeRefresh((n) => n + 1);
-          }
+          else setHomeRefresh((n) => n + 1);
           return new Promise((r) => setTimeout(r, 600));
         }}
       >
@@ -319,7 +316,101 @@ function MultiChips({
 
 /* ---------- главная каталога ---------- */
 
-const recCache = new Map<string, { basis: string; items: Drama[]; title: string }>();
+/* Рекомендации меняются: каждый раз берутся случайные опорные записи из библиотеки, страницы TMDB
+   и порядок перемешиваются, а недавно показанное уходит в конец очереди. Подборка живёт 20 минут,
+   потом обновляется сама при возвращении на экран; кнопка «Обновить» и потягивание вниз — сразу. */
+
+const REC_COUNT = 12;
+const REC_TTL = 20 * 60 * 1000;
+const SHOWN_LIMIT = 48;
+const recCache = new Map<MediaType, { items: Drama[]; title: string; at: number; personal: boolean }>();
+
+function shuffle<T>(list: T[]): T[] {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function shownKey(mediaType: MediaType) {
+  return `doramy.recs.shown.${mediaType}`;
+}
+
+/** Ключи, показанные в последних подборках (свежие в начале). */
+function readShown(mediaType: MediaType): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(shownKey(mediaType)) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberShown(mediaType: MediaType, keys: string[]) {
+  const next = [...keys, ...readShown(mediaType).filter((k) => !keys.includes(k))].slice(0, SHOWN_LIMIT);
+  try {
+    localStorage.setItem(shownKey(mediaType), JSON.stringify(next));
+  } catch {
+    // приватный режим: просто не запоминаем
+  }
+}
+
+/** Новые сначала, уже показанные — только если новых не хватило. */
+function pickFresh(candidates: Drama[], exclude: Set<string>, shown: Set<string>, count: number): Drama[] {
+  const fresh: Drama[] = [];
+  const seenBefore: Drama[] = [];
+  const used = new Set<string>();
+  for (const d of candidates) {
+    const k = itemKey(d.mediaType, d.id);
+    if (used.has(k) || exclude.has(k)) continue;
+    used.add(k);
+    (shown.has(k) ? seenBefore : fresh).push(d);
+  }
+  return [...fresh, ...shuffle(seenBefore)].slice(0, count);
+}
+
+async function buildRecs(
+  mediaType: MediaType,
+  anchors: SavedDrama[],
+  libraryKeys: Set<string>,
+  signal: AbortSignal,
+): Promise<{ items: Drama[]; title: string; personal: boolean }> {
+  const shown = new Set(readShown(mediaType));
+  let personal: Drama[] = [];
+
+  if (anchors.length) {
+    // Избранное чаще попадает в опору, но каждый раз в другом составе.
+    const favorites = shuffle(anchors.filter((s) => s.isFavorite));
+    const others = shuffle(anchors.filter((s) => !s.isFavorite));
+    const picked = shuffle([...favorites.slice(0, 2), ...others].slice(0, 4).concat(favorites.slice(2)).slice(0, 4));
+    const lists = await Promise.all(
+      picked.map((s) =>
+        recommendations(mediaType, s.tmdbId, signal, Math.random() < 0.5 ? 1 : 2)
+          .then(shuffle)
+          .catch(() => [] as Drama[]),
+      ),
+    );
+    // По одному из каждого источника по кругу, чтобы не доминировал один сериал.
+    const mixed: Drama[] = [];
+    for (let i = 0; i < 20; i++) for (const l of lists) if (l[i]) mixed.push(l[i]);
+    personal = pickFresh(mixed, libraryKeys, shown, REC_COUNT);
+  }
+
+  let items = personal;
+  if (items.length < REC_COUNT) {
+    // Мало своих — добираем популярным со случайной страницы.
+    const page = 1 + Math.floor(Math.random() * 5);
+    const r = await discover({ mediaType, country: '', genre: '', sort: 'popular', page }, signal).catch(() => null);
+    const extra = pickFresh(shuffle(r?.items ?? []), new Set([...libraryKeys, ...items.map((d) => itemKey(d.mediaType, d.id))]), shown, REC_COUNT - items.length);
+    items = [...items, ...extra];
+  }
+
+  rememberShown(mediaType, items.map((d) => itemKey(d.mediaType, d.id)));
+  const isPersonal = personal.length > 0;
+  return { items, title: isPersonal ? 'Рекомендации для тебя' : 'Популярное сейчас', personal: isPersonal };
+}
 
 function CatalogHome({
   mediaType,
@@ -333,69 +424,81 @@ function CatalogHome({
   refreshKey: number;
 }) {
   const configured = useConfigured();
-  // Опора для рекомендаций: избранное и просмотренное/смотрю этого типа, самые свежие.
-  const basisItems = useMemo(
+  // Опора для рекомендаций: избранное, просмотренное и то, что смотрю, этого типа.
+  const anchors = useMemo(
     () =>
-      library
-        .filter((s) => s.mediaType === mediaType && (s.isFavorite || s.status === 'completed' || s.status === 'watching'))
-        .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || b.updatedAt - a.updatedAt)
-        .slice(0, 4),
+      library.filter(
+        (s) => s.mediaType === mediaType && (s.isFavorite || s.status === 'completed' || s.status === 'watching'),
+      ),
     [library, mediaType],
   );
-  const basis = basisItems.map((s) => s.tmdbId).join(',');
   const libraryKeys = useMemo(() => new Set(library.map((s) => s.key)), [library]);
+  const hasAnchors = anchors.length > 0;
 
-  const [recs, setRecs] = useState<{ title: string; items: Drama[] } | null>(() => {
-    const c = recCache.get(mediaType);
-    return c && c.basis === basis ? { title: c.title, items: c.items } : null;
-  });
+  const [recs, setRecs] = useState<{ title: string; items: Drama[] } | null>(() => recCache.get(mediaType) ?? null);
   const [loading, setLoading] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  const latest = useRef({ anchors, libraryKeys, hasAnchors });
+  latest.current = { anchors, libraryKeys, hasAnchors };
 
+  const load = useCallback(
+    (force: boolean) => {
+      if (!configured) return;
+      const cached = recCache.get(mediaType);
+      const stale =
+        !cached || Date.now() - cached.at > REC_TTL || (latest.current.hasAnchors && !cached.personal);
+      if (cached && !force && !stale) {
+        setRecs(cached);
+        return;
+      }
+      if (cached) setRecs(cached);
+      controller.current?.abort();
+      const c = new AbortController();
+      controller.current = c;
+      setLoading(true);
+      buildRecs(mediaType, latest.current.anchors, latest.current.libraryKeys, c.signal)
+        .then((r) => {
+          if (c.signal.aborted) return;
+          remember(r.items);
+          const entry = { ...r, at: Date.now() };
+          recCache.set(mediaType, entry);
+          setRecs(entry);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (controller.current === c) setLoading(false);
+        });
+    },
+    [configured, mediaType],
+  );
+
+  // Открытие экрана и смена «Сериалы/Фильмы»: из кэша, если он свежий.
+  // Появилась первая опорная запись — сразу переключаемся с популярного на личные рекомендации.
   useEffect(() => {
-    if (!configured) return;
-    const cached = recCache.get(mediaType);
-    if (cached && cached.basis === basis) {
-      setRecs({ title: cached.title, items: cached.items });
-      return;
-    }
-    const controller = new AbortController();
-    setLoading(true);
-    (async () => {
-      let items: Drama[] = [];
-      let title = 'Рекомендации для тебя';
-      if (basisItems.length) {
-        const lists = await Promise.all(
-          basisItems.map((s) => recommendations(mediaType, s.tmdbId, controller.signal).catch(() => [] as Drama[])),
-        );
-        // Перемешиваем по кругу: по одному из каждого источника, чтобы не доминировал один сериал.
-        const seen = new Set<string>();
-        for (let i = 0; i < 20; i++) {
-          for (const l of lists) {
-            const d = l[i];
-            if (!d) continue;
-            const k = itemKey(d.mediaType, d.id);
-            if (seen.has(k) || libraryKeys.has(k)) continue;
-            seen.add(k);
-            items.push(d);
-          }
-        }
-        items = items.slice(0, 12);
-      }
-      if (items.length === 0) {
-        title = 'Популярное сейчас';
-        const r = await discover({ mediaType, country: '', genre: '', sort: 'topRated', page: 1 }, controller.signal).catch(() => null);
-        items = (r?.items ?? []).filter((d) => !libraryKeys.has(itemKey(d.mediaType, d.id))).slice(0, 12);
-      }
-      remember(items);
-      recCache.set(mediaType, { basis, items, title });
-      setRecs({ title, items });
-    })()
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-    // libraryKeys меняется при каждом изменении библиотеки; пересчёт нужен только при смене опоры.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configured, mediaType, basis, refreshKey]);
+    load(false);
+    return () => controller.current?.abort();
+  }, [load, hasAnchors]);
+
+  // Потягивание вниз на главной каталога.
+  const lastRefreshKey = useRef(refreshKey);
+  useEffect(() => {
+    if (lastRefreshKey.current === refreshKey) return;
+    lastRefreshKey.current = refreshKey;
+    load(true);
+  }, [refreshKey, load]);
+
+  // Вернулись в приложение спустя время — подборка обновится, если устарела.
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === 'visible' && load(false);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [load]);
+
+  // Добавленное в библиотеку сразу пропадает из подборки, без нового запроса.
+  const shownItems = useMemo(
+    () => (recs?.items ?? []).filter((d) => !libraryKeys.has(itemKey(d.mediaType, d.id))),
+    [recs, libraryKeys],
+  );
 
   const moodBg = recs?.items.find((d) => d.backdropPath)?.backdropPath ?? null;
 
@@ -411,12 +514,32 @@ function CatalogHome({
       </div>
 
       <section className="pblock">
-        <h2 className="home-h2">{recs?.title ?? 'Рекомендации для тебя'}</h2>
+        <div className="home-head">
+          <h2 className="home-h2">{recs?.title ?? 'Рекомендации для тебя'}</h2>
+          {configured && (
+            <button
+              className="icon-btn refresh-btn"
+              onClick={() => load(true)}
+              disabled={loading}
+              aria-label="Обновить рекомендации"
+              title="Обновить"
+            >
+              <RefreshIcon spinning={loading} />
+            </button>
+          )}
+        </div>
         {loading && !recs ? (
-          <div className="spinner">Подбираем…</div>
-        ) : recs && recs.items.length > 0 ? (
-          <div className="rec-strip">
-            {recs.items.map((d) => (
+          <div className="rec-strip" aria-busy="true">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="rec" aria-hidden="true">
+                <div className="rec-img skeleton" />
+                <div className="skeleton skeleton-line" style={{ width: '70%', marginTop: 8 }} />
+              </div>
+            ))}
+          </div>
+        ) : shownItems.length > 0 ? (
+          <div className="rec-strip" data-loading={loading}>
+            {shownItems.map((d) => (
               <RecCard key={itemKey(d.mediaType, d.id)} drama={d} />
             ))}
           </div>
@@ -435,6 +558,25 @@ function CatalogHome({
         </div>
       </section>
     </div>
+  );
+}
+
+function RefreshIcon({ spinning }: { spinning: boolean }) {
+  return (
+    <svg
+      className="refresh-icon"
+      data-spin={spinning}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+      <path d="M20 4v4.5h-4.5" />
+    </svg>
   );
 }
 
