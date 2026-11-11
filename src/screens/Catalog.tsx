@@ -10,7 +10,7 @@ import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
 import { openDrama } from '../lib/router';
-import { backdropUrl, discover, randomPick, recommendations, remember, search } from '../lib/tmdb';
+import { backdropUrl, discover, discoverAsia, randomPick, recommendations, remember, search } from '../lib/tmdb';
 import {
   COUNTRIES,
   countryLabel,
@@ -426,6 +426,7 @@ function CatalogHome({
   refreshKey: number;
 }) {
   const configured = useConfigured();
+  const genreArt = useGenreArt(mediaType, configured);
   // Опора для рекомендаций: избранное, просмотренное и то, что смотрю, этого типа.
   const anchors = useMemo(
     () =>
@@ -508,10 +509,14 @@ function CatalogHome({
     <div className="home">
       <div className="genre-cards">
         {GENRE_CARDS[mediaType].map((g) => (
-          <button key={g.id} className="genre-card" style={{ background: `linear-gradient(160deg, ${g.from}, ${g.to})` }} onClick={() => onGenre(g.id)}>
-            <span>{g.title}</span>
-            <GenreArt id={g.id} />
-          </button>
+          <GenreCard
+            key={`${mediaType}:${g.id}`}
+            title={g.title}
+            from={g.from}
+            to={g.to}
+            backdrop={genreArt[g.id]}
+            onClick={() => onGenre(g.id)}
+          />
         ))}
       </div>
 
@@ -617,46 +622,119 @@ function RecCard({ drama }: { drama: Drama }) {
   );
 }
 
-/** Простая геометрическая иллюстрация жанра: без эмодзи и картинок. */
-function GenreArt({ id }: { id: number }) {
+/* ---------- кадры для карточек жанров ----------
+ * Каждой карточке — кадр (backdrop) из самого популярного азиатского сериала или фильма этого жанра.
+ * Кадры не повторяются между жанрами и хранятся на устройстве неделю, поэтому появляются сразу.
+ */
+
+type GenreArt = Record<number, string>; // id жанра → backdrop_path
+const GENRE_ART_KEY = 'doramy.genreArt.v1.';
+const GENRE_ART_TTL = 7 * 24 * 60 * 60 * 1000;
+const ANIMATION = 16;
+
+function readGenreArt(mediaType: MediaType): GenreArt | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GENRE_ART_KEY + mediaType) ?? 'null') as { at: number; art: GenreArt } | null;
+    return raw && Date.now() - raw.at < GENRE_ART_TTL ? raw.art : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGenreArt(mediaType: MediaType, art: GenreArt) {
+  try {
+    localStorage.setItem(GENRE_ART_KEY + mediaType, JSON.stringify({ at: Date.now(), art }));
+  } catch {
+    // приватный режим: просто загрузим заново в следующий раз
+  }
+}
+
+async function loadGenreArt(mediaType: MediaType, signal: AbortSignal): Promise<GenreArt> {
+  const cards = GENRE_CARDS[mediaType];
+  const lists = await Promise.all(
+    cards.map((g) =>
+      discoverAsia(
+        mediaType,
+        {
+          with_genres: String(g.id),
+          sort_by: 'popularity.desc',
+          'vote_count.gte': mediaType === 'tv' ? '80' : '300',
+          // Аниме-кадр в «Драме» или «Детективе» выглядит чужим; у «Анимации» — наоборот.
+          ...(g.id === ANIMATION ? {} : { without_genres: String(ANIMATION) }),
+        },
+        1,
+        signal,
+      ).catch((e: Error) => {
+        if (e.name === 'AbortError') throw e;
+        return null;
+      }),
+    ),
+  );
+  // Раздаём по очереди: каждому жанру — самый популярный кадр, ещё не занятый другим жанром.
+  const used = new Set<string>();
+  const art: GenreArt = {};
+  cards.forEach((g, i) => {
+    const pick = (lists[i]?.items ?? []).find((d) => d.backdropPath && !used.has(d.backdropPath));
+    if (pick?.backdropPath) {
+      used.add(pick.backdropPath);
+      art[g.id] = pick.backdropPath;
+    }
+  });
+  return art;
+}
+
+function useGenreArt(mediaType: MediaType, enabled: boolean): GenreArt {
+  const [art, setArt] = useState<GenreArt>(() => readGenreArt(mediaType) ?? {});
+  useEffect(() => {
+    const cached = readGenreArt(mediaType);
+    setArt(cached ?? {});
+    if (cached || !enabled) return;
+    const controller = new AbortController();
+    loadGenreArt(mediaType, controller.signal)
+      .then((a) => {
+        if (Object.keys(a).length === 0) return;
+        writeGenreArt(mediaType, a);
+        setArt(a);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [mediaType, enabled]);
+  return art;
+}
+
+function GenreCard({
+  title,
+  from,
+  to,
+  backdrop,
+  onClick,
+}: {
+  title: string;
+  from: string;
+  to: string;
+  backdrop: string | undefined;
+  onClick: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const src = backdropUrl(backdrop);
   return (
-    <svg className="genre-art" viewBox="0 0 100 100" aria-hidden>
-      {id === 9648 || id === 53 ? (
-        <>
-          <circle cx="42" cy="42" r="22" />
-          <path d="M58 58l24 24" strokeWidth="10" />
-        </>
-      ) : id === 10766 || id === 10749 ? (
-        <path d="M50 84L22 56a16 16 0 0 1 28-16 16 16 0 0 1 28 16z" />
-      ) : id === 35 ? (
-        <>
-          <circle cx="50" cy="50" r="30" />
-          <path d="M34 58q16 16 32 0" strokeWidth="6" fill="none" />
-        </>
-      ) : id === 10765 || id === 878 ? (
-        <>
-          <circle cx="50" cy="50" r="18" />
-          <ellipse cx="50" cy="50" rx="42" ry="12" fill="none" strokeWidth="5" />
-        </>
-      ) : id === 10759 || id === 28 || id === 12 ? (
-        <path d="M20 80L70 30l10 10-50 50zM66 26l12-6-6 12z" />
-      ) : id === 18 ? (
-        <>
-          <path d="M22 30h56v40H22z" />
-          <path d="M22 70l14 12 8-12" />
-        </>
-      ) : id === 10751 ? (
-        <>
-          <circle cx="36" cy="40" r="12" />
-          <circle cx="64" cy="40" r="12" />
-          <path d="M20 84q30-30 60 0z" />
-        </>
-      ) : id === 27 ? (
-        <path d="M30 86V46a20 20 0 0 1 40 0v40l-8-8-8 8-8-8-8 8-8-8z" />
-      ) : (
-        <path d="M30 24l44 26-44 26z" />
+    <button className="genre-card" style={{ background: `linear-gradient(160deg, ${from}, ${to})` }} onClick={onClick}>
+      {src && (
+        <img
+          className="genre-img"
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          data-loaded={loaded}
+          onLoad={() => setLoaded(true)}
+        />
       )}
-    </svg>
+      {/* Цвет жанра слегка тонирует кадр, а затемнение снизу держит подпись читаемой. */}
+      <span className="genre-tint" style={{ background: `linear-gradient(160deg, ${from}66, transparent 60%)` }} />
+      <span className="genre-title">{title}</span>
+    </button>
   );
 }
 
