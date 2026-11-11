@@ -28,6 +28,7 @@ export function Poster({
       alt={alt}
       loading="lazy"
       decoding="async"
+      draggable={false}
       onError={() => setFailed(true)}
     />
   );

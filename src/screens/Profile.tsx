@@ -245,7 +245,7 @@ function KindSection({ kind, title, items }: { kind: LibraryKind; title: string;
         <div className="strip">
           {list.slice(0, 12).map((s) => (
             <button key={s.key} className="strip-item" onClick={() => openDrama(s.mediaType, s.tmdbId)}>
-              <Poster path={s.posterPath} alt={s.title} size="w185" className="strip-poster" />
+              <Poster path={s.posterPath} alt={s.title} size="w342" className="strip-poster" />
               <span className="strip-title">{s.title}</span>
             </button>
           ))}

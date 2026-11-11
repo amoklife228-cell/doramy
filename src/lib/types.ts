@@ -55,6 +55,11 @@ export interface SavedDrama {
   /** 1..10 или null */
   userRating: number | null;
   episodesWatched: number;
+  /**
+   * Сколько серий (у фильма 0 или 1) уже засчитано в активность. Растёт только вверх,
+   * поэтому «минус, потом плюс» не засчитывает ту же серию второй раз. Нет — равно episodesWatched.
+   */
+  countedUnits?: number;
   notes: string;
   isFavorite: boolean;
   addedAt: number;
@@ -346,6 +351,9 @@ export interface ActivityDay {
   units: number;
   minutes: number;
   updatedAt: number;
+  /** Значения, которые были на сервере после последней синхронизации: разница с ними — неотправленный прирост. */
+  syncedUnits?: number;
+  syncedMinutes?: number;
 }
 
 export function todayKey(d = new Date()): string {

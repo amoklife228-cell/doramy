@@ -50,7 +50,16 @@ export function TabBar({ active, hidden }: { active: Tab; hidden: boolean }) {
           key={t.id}
           className="tab"
           data-active={active === t.id}
-          onClick={() => navigate(`/${t.id}`)}
+          onClick={() => {
+            // Повторное нажатие на открытую вкладку прокручивает её наверх, как в iOS.
+            if (active === t.id && !hidden) {
+              document
+                .querySelector('.screen[data-active="true"] .content')
+                ?.scrollTo({ top: 0, behavior: 'smooth' });
+              return;
+            }
+            navigate(`/${t.id}`);
+          }}
           aria-current={active === t.id ? 'page' : undefined}
         >
           <span className="tab-icon">{t.icon}</span>

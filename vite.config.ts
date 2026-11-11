@@ -20,17 +20,25 @@ export default defineConfig({
         background_color: '#000000',
         theme_color: '#000000',
         icons: [
-          { src: 'icon-192.png?v=3', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512.png?v=3', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          // Сердце занимает центр, фон на весь квадрат: безопасная зона маски соблюдена.
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         navigateFallback: '/doramy/index.html',
         runtimeCaching: [
           {
-            urlPattern: /\/doramy\/news\.json$/,
+            // Адрес приходит с ?t=..., поэтому без якоря $ и с ignoreSearch: одна запись, свежая при сети.
+            urlPattern: /\/doramy\/news\.json(\?.*)?$/,
             handler: 'NetworkFirst',
-            options: { cacheName: 'news', networkTimeoutSeconds: 6, expiration: { maxEntries: 2 } },
+            options: {
+              cacheName: 'news',
+              networkTimeoutSeconds: 6,
+              matchOptions: { ignoreSearch: true },
+              expiration: { maxEntries: 1 },
+            },
           },
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\//,
@@ -46,7 +54,7 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'tmdb-api',
-              networkTimeoutSeconds: 8,
+              networkTimeoutSeconds: 4,
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
             },
           },

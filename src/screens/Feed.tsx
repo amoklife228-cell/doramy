@@ -73,7 +73,7 @@ export function Feed({ active }: { active: boolean }) {
             <div className="strip">
               {upcoming.map((u) => (
                 <button key={u.item.key} className="strip-item strip-wide" onClick={() => openDrama('tv', u.item.tmdbId)}>
-                  <Poster path={u.item.posterPath} alt={u.item.title} size="w185" className="strip-poster" />
+                  <Poster path={u.item.posterPath} alt={u.item.title} size="w342" className="strip-poster" />
                   <span className="strip-title">{u.item.title}</span>
                   <span className="strip-sub">
                     {u.number ? `Серия ${u.number} · ` : ''}

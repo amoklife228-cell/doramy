@@ -25,24 +25,48 @@ export function DramaGrid({
   hasMore,
   onLoadMore,
   showType = false,
+  error = null,
+  onRetry,
 }: {
   items: Drama[];
   loading: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
   showType?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const sentinel = useInfiniteScroll(onLoadMore, hasMore && !loading);
+  const firstLoad = loading && items.length === 0;
   return (
     <>
       <div className="grid">
         {items.map((d) => (
           <DramaCard key={itemKey(d.mediaType, d.id)} drama={d} showType={showType} />
         ))}
+        {firstLoad && Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />)}
       </div>
       <div ref={sentinel} className="sentinel" />
-      {loading && <div className="spinner">Загружаем…</div>}
+      {loading && !firstLoad && <div className="spinner">Загружаем…</div>}
+      {error && !loading && items.length > 0 && onRetry && (
+        <div className="load-error">
+          <span className="muted small">Не удалось загрузить ещё</span>
+          <button className="btn" onClick={onRetry}>
+            Повторить
+          </button>
+        </div>
+      )}
     </>
+  );
+}
+
+export function CardSkeleton() {
+  return (
+    <div className="card" aria-hidden="true">
+      <div className="card-poster skeleton" />
+      <div className="skeleton skeleton-line" style={{ width: '80%', marginTop: 8 }} />
+      <div className="skeleton skeleton-line" style={{ width: '50%' }} />
+    </div>
   );
 }
 

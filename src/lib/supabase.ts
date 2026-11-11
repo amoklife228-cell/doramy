@@ -51,5 +51,6 @@ export async function signUp(email: string, password: string): Promise<'signed_i
 
 export async function signOut(): Promise<void> {
   if (!supabase) return;
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(humanize(error.message));
 }

@@ -14,6 +14,7 @@ import {
   type Appearance,
 } from '../lib/appearance';
 import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
+import { NavBar } from '../components/NavBar';
 import { plural } from './Profile';
 import { AccountSection } from './Account';
 
@@ -145,11 +146,7 @@ export function Settings({ session }: { session: Session | null | undefined }) {
 
   return (
     <div className="detail" role="dialog" aria-modal="true">
-      <header className="detail-bar">
-        <button className="back" onClick={goBack} aria-label="Назад">
-          ‹ Назад
-        </button>
-      </header>
+      <NavBar backLabel="Профиль" />
       <div className="content detail-content ios-page">
         <h1 className="ios-large-title">Настройки</h1>
 

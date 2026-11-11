@@ -78,6 +78,7 @@ export async function logActivity(units: number, minutes: number, day = todayKey
   if (units <= 0) return;
   const existing = await db.activity.get(day);
   const row: ActivityDay = {
+    ...existing,
     day,
     units: (existing?.units ?? 0) + units,
     minutes: (existing?.minutes ?? 0) + Math.max(0, Math.round(minutes)),
@@ -85,6 +86,13 @@ export async function logActivity(units: number, minutes: number, day = todayKey
   };
   await db.activity.put(row);
   onChange?.(day, 'activity');
+}
+
+/** Сколько уже засчитано у записи: для старых записей без поля — по текущему прогрессу. */
+function countedOf(s: SavedDrama): number {
+  if (typeof s.countedUnits === 'number') return s.countedUnits;
+  if (s.mediaType === 'movie') return s.status === 'completed' ? 1 : 0;
+  return s.episodesWatched;
 }
 
 export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<void> {
@@ -109,6 +117,7 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
     status,
     userRating: null,
     episodesWatched: drama.mediaType === 'movie' ? 0 : watched,
+    countedUnits: watched,
     notes: '',
     isFavorite: false,
     addedAt: now,
@@ -120,23 +129,29 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
 }
 
 /**
- * Обновить запись. Если выросло число просмотренных серий или фильм стал «просмотрен»,
- * разница засчитывается в активность за сегодня.
+ * Обновить запись. Если прогресс превысил уже засчитанный (countedUnits),
+ * разница засчитывается в активность за сегодня; откат и повтор второй раз не считаются.
  */
 export async function updateEntry(key: string, patch: Partial<SavedDrama>): Promise<void> {
   const before = await db.items.get(key);
-  await db.items.update(key, { ...patch, updatedAt: Date.now() });
-  onChange?.(key, 'put');
   if (!before) return;
 
-  if (before.mediaType === 'movie') {
-    if (patch.status === 'completed' && before.status !== 'completed') {
-      await logActivity(1, minutesPerUnit(before));
-    }
-  } else if (typeof patch.episodesWatched === 'number' && patch.episodesWatched > before.episodesWatched) {
-    const delta = patch.episodesWatched - before.episodesWatched;
-    await logActivity(delta, delta * minutesPerUnit(before));
-  }
+  const counted = countedOf(before);
+  const progress =
+    before.mediaType === 'movie'
+      ? (patch.status ?? before.status) === 'completed'
+        ? 1
+        : 0
+      : (patch.episodesWatched ?? before.episodesWatched);
+  const delta = progress - counted;
+
+  await db.items.update(key, {
+    ...patch,
+    ...(delta > 0 || before.countedUnits === undefined ? { countedUnits: Math.max(counted, progress) } : {}),
+    updatedAt: Date.now(),
+  });
+  onChange?.(key, 'put');
+  if (delta > 0) await logActivity(delta, delta * minutesPerUnit(before));
 }
 
 export async function removeEntry(key: string): Promise<void> {
@@ -208,6 +223,7 @@ export async function importLibrary(json: string): Promise<number> {
       status: STATUSES.includes(raw.status as WatchStatus) ? (raw.status as WatchStatus) : 'planned',
       userRating: typeof raw.userRating === 'number' ? raw.userRating : null,
       episodesWatched: raw.episodesWatched ?? 0,
+      countedUnits: typeof raw.countedUnits === 'number' ? raw.countedUnits : undefined,
       notes: raw.notes ?? '',
       isFavorite: !!raw.isFavorite,
       addedAt: raw.addedAt ?? now,
@@ -221,7 +237,15 @@ export async function importLibrary(json: string): Promise<number> {
     const days: ActivityDay[] = [];
     for (const raw of parsed.activity as Partial<ActivityDay>[]) {
       if (typeof raw.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.day)) continue;
-      days.push({ day: raw.day, units: raw.units ?? 0, minutes: raw.minutes ?? 0, updatedAt: raw.updatedAt ?? Date.now() });
+      // Повторный импорт той же копии не должен удваивать дни: берём большее из своего и импортированного.
+      const existing = await db.activity.get(raw.day);
+      days.push({
+        ...existing,
+        day: raw.day,
+        units: Math.max(existing?.units ?? 0, raw.units ?? 0),
+        minutes: Math.max(existing?.minutes ?? 0, raw.minutes ?? 0),
+        updatedAt: Date.now(),
+      });
     }
     await db.activity.bulkPut(days);
     for (const d of days) onChange?.(d.day, 'activity');

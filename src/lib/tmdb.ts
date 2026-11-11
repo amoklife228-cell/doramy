@@ -316,12 +316,15 @@ export async function recommendations(mediaType: MediaType, id: number, signal?:
   return r.results.map((d) => toDrama(mediaType, d));
 }
 
-/** Случайная популярная запись: случайная страница из первых 15 и случайный элемент на ней. */
+/** Случайная популярная запись: случайная страница из первых 15 (но не дальше последней) и случайный элемент на ней. */
 export async function randomPick(mediaType: MediaType, country: string, signal?: AbortSignal): Promise<Drama | null> {
-  const page = 1 + Math.floor(Math.random() * 15);
-  const r = await discover({ mediaType, country, genre: '', sort: 'popular', page }, signal);
-  if (r.items.length === 0) return null;
-  return r.items[Math.floor(Math.random() * r.items.length)];
+  const first = await discover({ mediaType, country, genre: '', sort: 'popular', page: 1 }, signal);
+  const pages = Math.max(1, Math.min(15, first.totalPages));
+  const page = 1 + Math.floor(Math.random() * pages);
+  const r = page === 1 ? first : await discover({ mediaType, country, genre: '', sort: 'popular', page }, signal);
+  const pool = r.items.length ? r.items : first.items;
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function backdropUrl(path: string | null | undefined): string | null {
@@ -335,6 +338,12 @@ export function posterUrl(path: string | null | undefined, size: 'w185' | 'w342'
 /** Кэш карточек, чтобы экран деталей открывался мгновенно и работал без сети. */
 export const dramaCache = new Map<string, Drama>();
 
+/** Запомнить карточки из списков. Полные данные из details() (с числом серий) не затираются урезанными. */
 export function remember(items: Drama[]) {
-  for (const d of items) dramaCache.set(itemKey(d.mediaType, d.id), d);
+  for (const d of items) {
+    const key = itemKey(d.mediaType, d.id);
+    const known = dramaCache.get(key);
+    if (known && (known.episodeCount !== undefined || known.runtime !== undefined)) continue;
+    dramaCache.set(key, d);
+  }
 }

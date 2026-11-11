@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { NavBar } from '../components/NavBar';
 import { Poster } from '../components/Poster';
 import { db } from '../lib/db';
 import { goBack, openDrama } from '../lib/router';
@@ -7,8 +8,9 @@ import { STATUS_BY_ID } from '../lib/types';
 
 /** Все записи с заметками, свежие сверху. */
 export function Notes() {
-  const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
-  const withNotes = items.filter((s) => s.notes.trim().length > 0).sort((a, b) => b.updatedAt - a.updatedAt);
+  // undefined, пока база не ответила: так не мелькает «Заметок пока нет».
+  const items = useLiveQuery(() => db.items.toArray(), []);
+  const withNotes = (items ?? []).filter((s) => s.notes.trim().length > 0).sort((a, b) => b.updatedAt - a.updatedAt);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goBack();
@@ -18,17 +20,13 @@ export function Notes() {
 
   return (
     <div className="detail" role="dialog" aria-modal="true">
-      <header className="detail-bar">
-        <button className="back" onClick={goBack} aria-label="Назад">
-          ‹ Назад
-        </button>
-        <span className="detail-kind">Заметки</span>
-      </header>
-      <div className="content detail-content">
-        {withNotes.length === 0 ? (
+      <NavBar backLabel="Профиль" />
+      <div className="content detail-content ios-page">
+        <h1 className="ios-large-title">Заметки</h1>
+        {items === undefined ? null : withNotes.length === 0 ? (
           <div className="empty">
             <div className="empty-title">Заметок пока нет</div>
-            <div className="empty-text">Открыть карточку сериала или фильма в библиотеке и написать заметку в поле «Заметки».</div>
+            <div className="empty-text">Откройте карточку сериала или фильма в библиотеке и напишите заметку в поле «Заметки».</div>
           </div>
         ) : (
           <ul className="rows">

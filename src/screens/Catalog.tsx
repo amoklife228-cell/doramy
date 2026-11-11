@@ -72,7 +72,14 @@ export function Catalog() {
   const [filters, setFilters] = useState<Record<MediaType, CatalogFilters>>({ tv: DEFAULT_FILTERS, movie: DEFAULT_FILTERS });
   const [text, setText] = useState('');
   const [randomBusy, setRandomBusy] = useState(false);
+  const [randomError, setRandomError] = useState<string | null>(null);
   const [homeRefresh, setHomeRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!randomError) return;
+    const t = setTimeout(() => setRandomError(null), 3000);
+    return () => clearTimeout(t);
+  }, [randomError]);
   const [filterOpen, setFilterOpen] = useState(false);
 
   const f = filters[mediaType];
@@ -135,7 +142,11 @@ export function Catalog() {
       if (d) {
         remember([d]);
         openDrama(d.mediaType, d.id);
+      } else {
+        setRandomError('Не нашлось, попробуйте ещё раз');
       }
+    } catch {
+      setRandomError('Нет соединения, попробуйте позже');
     } finally {
       setRandomBusy(false);
     }
@@ -243,7 +254,7 @@ export function Catalog() {
                   </button>
                 }
               />
-            ) : !list.loading && shown.length === 0 ? (
+            ) : !list.loading && shown.length === 0 && (!list.hasMore || list.pagesLoaded >= 5) ? (
               <EmptyState
                 title="Ничего не нашлось"
                 text={searching ? `По запросу «${query}» ничего нет${f.country === WORLD ? '' : '. Попробуйте «Весь мир»'}.` : 'Попробуйте другие фильтры.'}
@@ -254,7 +265,16 @@ export function Catalog() {
                 }
               />
             ) : (
-              <DramaGrid items={shown} loading={list.loading} hasMore={list.hasMore} onLoadMore={list.loadMore} />
+              // Поиск отсеивает результаты по стране на клиенте: первая страница может оказаться пустой,
+              // тогда сторож сетки сам подгрузит следующие (не больше 5 подряд, см. условие выше).
+              <DramaGrid
+                items={shown}
+                loading={list.loading || (shown.length === 0 && list.hasMore)}
+                hasMore={list.hasMore}
+                onLoadMore={list.loadMore}
+                error={list.error}
+                onRetry={list.retry}
+              />
             )}
           </>
         ) : (
@@ -264,6 +284,12 @@ export function Catalog() {
           </>
         )}
       </Refreshable>
+
+      {randomError && (
+        <div className="toast" role="status">
+          {randomError}
+        </div>
+      )}
 
       <FilterSheet open={filterOpen} mediaType={mediaType} value={f} onApply={(nf) => setF(nf)} onClose={() => setFilterOpen(false)} />
     </>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { signIn, signOut, signUp, SYNC_AVAILABLE } from '../lib/supabase';
-import { clearLocalAfterSignOut, syncNow, useSyncState } from '../lib/sync';
+import { signOutAndClear, syncNow, useSyncState } from '../lib/sync';
 import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
 
 export function AccountSection({ session }: { session: Session | null | undefined }) {
@@ -19,12 +19,20 @@ export function AccountSection({ session }: { session: Session | null | undefine
 function SignedIn({ session }: { session: Session }) {
   const sync = useSyncState();
   const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const onSignOut = async () => {
-    const uid = session.user.id;
-    await signOut();
-    await clearLocalAfterSignOut(uid);
-    setConfirm(false);
+    setBusy(true);
+    setSignOutError(null);
+    try {
+      await signOutAndClear(session.user.id, signOut);
+      setConfirm(false);
+    } catch (e) {
+      setSignOutError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const email = session.user.email ?? '';
@@ -57,11 +65,20 @@ function SignedIn({ session }: { session: Session }) {
         />
       </IosSection>
       <IosSection
-        footer={confirm ? 'После выхода библиотека на этом устройстве очистится. В аккаунте она останется.' : undefined}
+        footer={
+          signOutError ??
+          (confirm ? 'После выхода библиотека на этом устройстве очистится. В аккаунте она останется.' : undefined)
+        }
       >
         {confirm ? (
           <>
-            <IosRow label="Да, выйти" destructive center onClick={() => void onSignOut()} />
+            <IosRow
+              label={busy ? 'Отправляем изменения…' : 'Да, выйти'}
+              destructive
+              center
+              disabled={busy}
+              onClick={() => void onSignOut()}
+            />
             <IosRow label="Отмена" accent center onClick={() => setConfirm(false)} />
           </>
         ) : (

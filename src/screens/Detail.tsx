@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Poster } from '../components/Poster';
 import { TrailerBlock } from '../components/TrailerBlock';
+import { EmptyState, NotConfigured } from '../components/DramaGrid';
+import { IosRow, IosSection, IosSwitch } from '../components/IosList';
+import { NavBar } from '../components/NavBar';
 import { addToLibrary, db, refreshMetadata, removeEntry, updateEntry } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { goBack } from '../lib/router';
@@ -16,6 +19,7 @@ import {
   localizedAirStatus,
   savedToDrama,
   STATUSES,
+  todayKey,
   yearOf,
   type Drama,
   type LibraryKind,
@@ -31,10 +35,12 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
   const entry = useLiveQuery(async () => (await db.items.get(key)) ?? null, [key]);
   const [fresh, setFresh] = useState<Drama | null>(dramaCache.get(key) ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!configured) return;
     const controller = new AbortController();
+    setError(null);
     details(mediaType, id, controller.signal)
       .then((d) => {
         dramaCache.set(key, d);
@@ -45,7 +51,7 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
         if (e.name !== 'AbortError') setError(e.message);
       });
     return () => controller.abort();
-  }, [mediaType, id, key, configured]);
+  }, [mediaType, id, key, configured, attempt]);
 
   // undefined = Dexie ещё не ответил; не показываем кнопку «Добавить», пока не знаем.
   const loadingEntry = entry === undefined;
@@ -64,18 +70,25 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
 
   return (
     <div className="detail" role="dialog" aria-modal="true">
-      <header className="detail-bar">
-        <button className="back" onClick={goBack} aria-label="Назад">
-          ‹ Назад
-        </button>
-        <span className="detail-kind">{isMovie ? 'Фильм' : 'Сериал'}</span>
-      </header>
+      <NavBar title={isMovie ? 'Фильм' : 'Сериал'} />
 
       {!drama ? (
         <div className="content">
-          <div className="empty">
-            <div className="empty-title">{error ?? 'Загружаем…'}</div>
-          </div>
+          {entry === null && !configured ? (
+            <NotConfigured />
+          ) : error ? (
+            <EmptyState
+              title="Не удалось загрузить"
+              text={error}
+              action={
+                <button className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>
+                  Повторить
+                </button>
+              }
+            />
+          ) : (
+            <HeroSkeleton />
+          )}
         </div>
       ) : (
         <div className="content detail-content">
@@ -105,31 +118,43 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
             </section>
           )}
 
-          <section className="block">
-            <h2>Информация</h2>
-            <dl className="info">
-              {drama.originalTitle && drama.originalTitle !== drama.title && (
-                <Row label="Оригинал" value={drama.originalTitle} />
-              )}
-              {country && <Row label="Страна" value={country.title} />}
-              {drama.firstAirDate && <Row label="Премьера" value={formatDate(drama.firstAirDate)} />}
-              {airStatus && <Row label="Статус" value={airStatus} />}
-              {isMovie && runtime && <Row label="Длительность" value={runtime} />}
-              {!isMovie && drama.episodeCount && (
-                <Row
-                  label="Серии"
-                  value={drama.seasonCount ? `${drama.episodeCount} эп., сезонов: ${drama.seasonCount}` : `${drama.episodeCount} эп.`}
-                />
-              )}
-              {drama.genreNames.length > 0 && <Row label="Жанры" value={drama.genreNames.join(', ')} />}
-              {drama.voteCount > 0 && (
-                <Row label="Рейтинг TMDB" value={`★ ${drama.voteAverage.toFixed(1)} (${drama.voteCount})`} />
-              )}
-            </dl>
-            {error && <p className="muted small">Подробности не загрузились: {error}</p>}
-          </section>
+          <IosSection
+            title="Информация"
+            footer={error ? `Подробности не загрузились: ${error}` : undefined}
+          >
+            {drama.originalTitle && drama.originalTitle !== drama.title && (
+              <InfoRow label="Оригинал" value={drama.originalTitle} />
+            )}
+            {country && <InfoRow label="Страна" value={country.title} />}
+            {drama.firstAirDate && <InfoRow label="Премьера" value={formatDate(drama.firstAirDate)} />}
+            {airStatus && <InfoRow label="Статус" value={airStatus} />}
+            {isMovie && runtime && <InfoRow label="Длительность" value={runtime} />}
+            {!isMovie && drama.episodeCount && (
+              <InfoRow
+                label="Серии"
+                value={drama.seasonCount ? `${drama.episodeCount} эп., сезонов: ${drama.seasonCount}` : `${drama.episodeCount} эп.`}
+              />
+            )}
+            {drama.genreNames.length > 0 && <InfoRow label="Жанры" value={drama.genreNames.join(', ')} />}
+            {drama.voteCount > 0 && (
+              <InfoRow label="Рейтинг TMDB" value={`★ ${drama.voteAverage.toFixed(1)} (${drama.voteCount})`} />
+            )}
+          </IosSection>
         </div>
       )}
+    </div>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="hero" aria-busy="true" aria-label="Загружаем">
+      <div className="hero-poster skeleton" />
+      <div className="hero-body" style={{ flex: 1 }}>
+        <div className="skeleton skeleton-line" style={{ width: '85%', height: 22 }} />
+        <div className="skeleton skeleton-line" style={{ width: '55%' }} />
+        <div className="skeleton skeleton-line" style={{ width: '35%' }} />
+      </div>
     </div>
   );
 }
@@ -139,7 +164,7 @@ function Hero({ drama }: { drama: Drama }) {
   const year = yearOf(drama.firstAirDate);
   return (
     <div className="hero">
-      <Poster path={drama.posterPath} alt={drama.title} size="w342" className="hero-poster" />
+      <Poster path={drama.posterPath} alt={drama.title} size="w500" className="hero-poster" />
       <div className="hero-body">
         <h1 className="hero-title">{drama.title}</h1>
         <div className="muted">{[year, country?.title].filter(Boolean).join(' · ')}</div>
@@ -150,34 +175,55 @@ function Hero({ drama }: { drama: Drama }) {
   );
 }
 
+/** Одно нажатие добавляет со статусом «Хочу посмотреть»; статус потом меняется строкой в редакторе. */
 function AddButtons({ drama }: { drama: Drama }) {
-  const [open, setOpen] = useState(false);
-  const statuses = drama.mediaType === 'movie' ? STATUSES.filter((s) => s.id !== 'watching' && s.id !== 'onHold') : STATUSES;
-  if (!open) {
-    return (
-      <button className="btn btn-primary btn-wide" onClick={() => setOpen(true)}>
-        Добавить в библиотеку
-      </button>
-    );
-  }
+  const [busy, setBusy] = useState(false);
   return (
-    <div className="block">
-      <h2>Со статусом</h2>
-      <div className="status-buttons">
-        {statuses.map((s) => (
-          <button key={s.id} className="btn" onClick={() => void addToLibrary(drama, s.id)}>
-            {s.title}
-          </button>
-        ))}
-      </div>
-    </div>
+    <button
+      className="btn btn-primary btn-wide"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void addToLibrary(drama, 'planned').finally(() => setBusy(false));
+      }}
+    >
+      Добавить в библиотеку
+    </button>
   );
+}
+
+function statusesFor(isMovie: boolean) {
+  return isMovie ? STATUSES.filter((s) => s.id !== 'watching' && s.id !== 'onHold') : STATUSES;
 }
 
 function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount: number | undefined }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [notes, setNotes] = useState(entry.notes);
   const isMovie = entry.mediaType === 'movie';
+
+  // Заметка сохраняется сама через полсекунды после ввода и при уходе с экрана.
+  // На iOS нажатие «Назад» не снимает фокус с поля, поэтому на onBlur полагаться нельзя.
+  const pending = useRef<{ key: string; notes: string } | null>(null);
+  const flush = () => {
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    void updateEntry(p.key, { notes: p.notes });
+  };
+  useEffect(() => {
+    if (notes === entry.notes) return;
+    pending.current = { key: entry.key, notes };
+    const t = setTimeout(flush, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
+  useEffect(() => flush, []);
+
+  // Заметку поменяли на другом устройстве, а здесь её сейчас не редактируют — показываем новую.
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!pending.current && document.activeElement !== notesRef.current) setNotes(entry.notes);
+  }, [entry.notes]);
 
   const setStatus = (status: WatchStatus) => {
     const patch: Partial<SavedDrama> = { status };
@@ -196,112 +242,132 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
   const autoKind = autoKindOf(entry);
   const kindTitle = (k: LibraryKind) => LIBRARY_KINDS.find((x) => x.id === k)!;
 
+  const statusTitle = STATUSES.find((s) => s.id === entry.status)?.title ?? '';
+  const statusOptions = statusesFor(isMovie);
+  // Если у фильма каким-то образом стоит «Смотрю», не теряем это значение в списке.
+  const shownStatuses = statusOptions.some((s) => s.id === entry.status)
+    ? statusOptions
+    : [...statusOptions, STATUSES.find((s) => s.id === entry.status)!];
+
   return (
-    <section className="block editor">
-      <h2>Моя библиотека</h2>
+    <>
+      <IosSection
+        title="Моя библиотека"
+        footer={`Добавлено ${formatDate(todayKey(new Date(entry.addedAt)))}`}
+      >
+        <IosRow label="Статус" value={statusTitle} chevron>
+          <select
+            className="ios-select-overlay"
+            aria-label="Статус"
+            value={entry.status}
+            onChange={(e) => setStatus(e.target.value as WatchStatus)}
+          >
+            {shownStatuses.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </select>
+        </IosRow>
 
-      <label className="field">
-        <span>Раздел</span>
-        <select
-          value={kindOf(entry)}
-          onChange={(e) => {
-            const k = e.target.value as LibraryKind;
-            // Совпадает с автоматическим — не храним, чтобы авто-правило могло работать дальше.
-            void updateEntry(entry.key, { kind: k === autoKind ? undefined : k });
-          }}
-        >
-          {LIBRARY_KINDS.map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.title}
-              {k.id === autoKind ? ' (авто)' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
+        {!isMovie && (
+          <IosRow
+            label="Серии"
+            sub={episodeCount ? `${entry.episodesWatched} из ${episodeCount}` : `просмотрено ${entry.episodesWatched}`}
+          >
+            <div className="stepper">
+              <button
+                onClick={() => setEpisodes(entry.episodesWatched - 1)}
+                disabled={entry.episodesWatched <= 0}
+                aria-label="Минус серия"
+              >
+                −
+              </button>
+              <span className="stepper-divider" aria-hidden="true" />
+              <button
+                onClick={() => setEpisodes(entry.episodesWatched + 1)}
+                disabled={!!episodeCount && entry.episodesWatched >= episodeCount}
+                aria-label="Плюс серия"
+              >
+                +
+              </button>
+            </div>
+          </IosRow>
+        )}
 
-      <label className="field">
-        <span>Статус</span>
-        <select value={entry.status} onChange={(e) => setStatus(e.target.value as WatchStatus)}>
-          {STATUSES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title}
-            </option>
-          ))}
-        </select>
-      </label>
+        <IosRow label="Моя оценка" value={entry.userRating ? `★ ${entry.userRating}` : 'нет'} chevron>
+          <select
+            className="ios-select-overlay"
+            aria-label="Моя оценка"
+            value={entry.userRating ?? ''}
+            onChange={(e) => void updateEntry(entry.key, { userRating: e.target.value ? Number(e.target.value) : null })}
+          >
+            <option value="">Без оценки</option>
+            {Array.from({ length: 10 }, (_, i) => 10 - i).map((v) => (
+              <option key={v} value={v}>
+                {'★'.repeat(Math.round(v / 2))} {v}
+              </option>
+            ))}
+          </select>
+        </IosRow>
 
-      <label className="field">
-        <span>Избранное</span>
-        <input
-          type="checkbox"
-          checked={entry.isFavorite}
-          onChange={(e) => void updateEntry(entry.key, { isFavorite: e.target.checked })}
-        />
-      </label>
+        <IosRow label="Избранное">
+          <IosSwitch
+            label="Избранное"
+            checked={entry.isFavorite}
+            onChange={(v) => void updateEntry(entry.key, { isFavorite: v })}
+          />
+        </IosRow>
 
-      {!isMovie && (
-        <div className="field">
-          <span>Просмотрено серий</span>
-          <div className="stepper">
-            <button onClick={() => setEpisodes(entry.episodesWatched - 1)} aria-label="Минус серия">
-              −
-            </button>
-            <span className="stepper-value">
-              {entry.episodesWatched}
-              {episodeCount ? ` / ${episodeCount}` : ''}
-            </span>
-            <button onClick={() => setEpisodes(entry.episodesWatched + 1)} aria-label="Плюс серия">
-              +
-            </button>
-          </div>
-        </div>
-      )}
+        <IosRow label="Раздел" value={kindTitle(kindOf(entry)).title} chevron>
+          <select
+            className="ios-select-overlay"
+            aria-label="Раздел"
+            value={kindOf(entry)}
+            onChange={(e) => {
+              const k = e.target.value as LibraryKind;
+              // Совпадает с автоматическим — не храним, чтобы авто-правило могло работать дальше.
+              void updateEntry(entry.key, { kind: k === autoKind ? undefined : k });
+            }}
+          >
+            {LIBRARY_KINDS.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.title}
+                {k.id === autoKind ? ' (авто)' : ''}
+              </option>
+            ))}
+          </select>
+        </IosRow>
+      </IosSection>
 
-      <label className="field">
-        <span>Моя оценка</span>
-        <select
-          value={entry.userRating ?? ''}
-          onChange={(e) => void updateEntry(entry.key, { userRating: e.target.value ? Number(e.target.value) : null })}
-        >
-          <option value="">Без оценки</option>
-          {Array.from({ length: 10 }, (_, i) => 10 - i).map((v) => (
-            <option key={v} value={v}>
-              {'★'.repeat(Math.round(v / 2))} {v}
-            </option>
-          ))}
-        </select>
-      </label>
+      <IosSection title="Заметки" footer="Сохраняется автоматически.">
+        <IosRow className="ios-row-stack">
+          <textarea
+            ref={notesRef}
+            className="ios-textarea"
+            rows={3}
+            placeholder="Впечатления, где остановились…"
+            aria-label="Заметки"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={flush}
+          />
+        </IosRow>
+      </IosSection>
 
-      <label className="field field-column">
-        <span>Заметки</span>
-        <textarea
-          rows={3}
-          placeholder="Впечатления, где остановились…"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => notes !== entry.notes && void updateEntry(entry.key, { notes })}
-        />
-      </label>
-
-      <div className="muted small">
-        Добавлено {formatDate(new Date(entry.addedAt).toISOString().slice(0, 10))} · в разделе «{kindTitle(kindOf(entry)).title}»
-      </div>
-
-      {confirmRemove ? (
-        <div className="status-buttons">
-          <button className="btn btn-danger" onClick={() => void removeEntry(entry.key)}>
-            Да, удалить
-          </button>
-          <button className="btn" onClick={() => setConfirmRemove(false)}>
-            Отмена
-          </button>
-        </div>
-      ) : (
-        <button className="btn btn-danger-text" onClick={() => setConfirmRemove(true)}>
-          Удалить из библиотеки
-        </button>
-      )}
-    </section>
+      <IosSection
+        footer={confirmRemove ? 'Запись, оценка и заметка будут удалены из библиотеки.' : undefined}
+      >
+        {confirmRemove ? (
+          <>
+            <IosRow label="Да, удалить" destructive center onClick={() => void removeEntry(entry.key)} />
+            <IosRow label="Отмена" accent center onClick={() => setConfirmRemove(false)} />
+          </>
+        ) : (
+          <IosRow label="Удалить из библиотеки" destructive center onClick={() => setConfirmRemove(true)} />
+        )}
+      </IosSection>
+    </>
   );
 }
 
@@ -314,13 +380,8 @@ function searchUrl(title: string, original: string, year: number | null, isMovie
   return `https://www.google.com/search?q=${encodeURIComponent(parts.join(' '))}`;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="info-row">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return <IosRow label={label} value={value} className="ios-row-info" />;
 }
 
 function formatDate(iso: string): string {

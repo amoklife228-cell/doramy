@@ -6,8 +6,13 @@ export interface PagedList {
   items: Drama[];
   loading: boolean;
   error: string | null;
+  /** Есть ещё страницы и автодогрузка не остановлена ошибкой. */
   hasMore: boolean;
+  /** Сколько страниц уже загружено. */
+  pagesLoaded: number;
   loadMore: () => void;
+  /** Повторить страницу, на которой случилась ошибка (или первую). */
+  retry: () => void;
   reload: () => void;
 }
 
@@ -79,13 +84,18 @@ export function usePagedList(
     void load(1);
   }, [key, version, load]);
 
-  const hasMore = nextPage <= totalPages;
+  // После ошибки автодогрузка останавливается, иначе сторож снова виден и запросы идут по кругу.
+  const hasMore = nextPage <= totalPages && !error;
 
   const loadMore = useCallback(() => {
     if (hasMore && !inFlight.current) void load(nextPage);
   }, [hasMore, nextPage, load]);
 
+  const retry = useCallback(() => {
+    if (!inFlight.current) void load(nextPage);
+  }, [nextPage, load]);
+
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
-  return { items, loading, error, hasMore, loadMore, reload };
+  return { items, loading, error, hasMore, pagesLoaded: nextPage - 1, loadMore, retry, reload };
 }

@@ -94,6 +94,29 @@ export function IosRow({
   return <div className={cls}>{body}</div>;
 }
 
+/** Переключатель iOS (51×31). */
+export function IosSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}) {
+  return (
+    <input
+      type="checkbox"
+      role="switch"
+      className="ios-switch"
+      aria-label={label}
+      aria-checked={checked}
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+  );
+}
+
 function Chevron() {
   return (
     <svg className="ios-chevron" viewBox="0 0 8 14" fill="none" aria-hidden="true">
