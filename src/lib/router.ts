@@ -12,6 +12,8 @@ export interface Route {
   libraryFavorites: boolean;
   detail: { mediaType: MediaType; id: number } | null;
   overlay: Overlay | null;
+  /** `#/collection/<tv|movie>/<id>` — полный список подборки с главной каталога. */
+  collection: { mediaType: MediaType; id: string } | null;
 }
 
 const TABS: Tab[] = ['catalog', 'library', 'feed', 'profile'];
@@ -22,12 +24,25 @@ let lastTab: Tab = 'catalog';
 
 export function parseHash(hash: string): Route {
   const path = hash.replace(/^#/, '');
-  const base: Route = { tab: lastTab, libraryKind: null, libraryFavorites: false, detail: null, overlay: null };
+  const base: Route = {
+    tab: lastTab,
+    libraryKind: null,
+    libraryFavorites: false,
+    detail: null,
+    overlay: null,
+    collection: null,
+  };
 
   const detail = path.match(/^\/(tv|movie|drama)\/(\d+)/);
   if (detail) {
     const mediaType: MediaType = detail[1] === 'movie' ? 'movie' : 'tv';
     return { ...base, detail: { mediaType, id: Number(detail[2]) } };
+  }
+
+  const collection = path.match(/^\/collection\/(tv|movie)\/([a-z0-9]+)/);
+  if (collection) {
+    lastTab = 'catalog';
+    return { ...base, tab: 'catalog', collection: { mediaType: collection[1] as MediaType, id: collection[2] } };
   }
 
   const [seg, sub] = path.replace(/^\//, '').split('/');
@@ -37,7 +52,11 @@ export function parseHash(hash: string): Route {
   lastTab = tab;
   const libraryKind = tab === 'library' && KINDS.includes(sub as LibraryKind) ? (sub as LibraryKind) : null;
   const libraryFavorites = tab === 'library' && sub === 'favorites';
-  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null };
+  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null, collection: null };
+}
+
+export function openCollection(mediaType: MediaType, id: string) {
+  navigate(`/collection/${mediaType}/${id}`);
 }
 
 export function useRoute(): Route {

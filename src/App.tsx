@@ -1,4 +1,5 @@
-import { useRoute, type Tab } from './lib/router';
+import { useEffect, useState } from 'react';
+import { useRoute, type Route, type Tab } from './lib/router';
 import { useSession } from './lib/supabase';
 import { useSyncLifecycle } from './lib/sync';
 import { itemKey } from './lib/types';
@@ -11,13 +12,22 @@ import { Settings } from './screens/Settings';
 import { Notes } from './screens/Notes';
 import { History } from './screens/History';
 import { Detail } from './screens/Detail';
+import { Collection } from './screens/Collection';
 
 export default function App() {
   const route = useRoute();
   const session = useSession();
   useSyncLifecycle(!!session);
 
-  const overlayOpen = route.detail !== null || route.overlay !== null;
+  // Подборка остаётся под открытой карточкой: «Назад» вернёт к тому же месту списка, без перезагрузки.
+  const [keptCollection, setKeptCollection] = useState<Route['collection']>(null);
+  useEffect(() => {
+    if (route.collection) setKeptCollection(route.collection);
+    else if (!route.detail) setKeptCollection(null);
+  }, [route]);
+  const collection = route.collection ?? (route.detail ? keptCollection : null);
+
+  const overlayOpen = route.detail !== null || route.overlay !== null || collection !== null;
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>
@@ -34,6 +44,13 @@ export default function App() {
       {route.overlay === 'settings' && <Settings session={session} />}
       {route.overlay === 'notes' && <Notes />}
       {route.overlay === 'history' && <History />}
+      {collection && (
+        <Collection
+          key={`${collection.mediaType}:${collection.id}`}
+          mediaType={collection.mediaType}
+          id={collection.id}
+        />
+      )}
       {route.detail && (
         <Detail
           key={itemKey(route.detail.mediaType, route.detail.id)}

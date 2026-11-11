@@ -3,18 +3,32 @@ import { useInfiniteScroll } from '../lib/hooks';
 import { countryLabel, itemKey, yearOf, type Drama } from '../lib/types';
 import { Poster } from './Poster';
 
-export function DramaCard({ drama, showType = false }: { drama: Drama; showType?: boolean }) {
+export function DramaCard({
+  drama,
+  showType = false,
+  rank,
+  note,
+}: {
+  drama: Drama;
+  showType?: boolean;
+  /** Место в рейтинге (ТОП-500). */
+  rank?: number;
+  /** Подпись под карточкой, например награда. */
+  note?: string;
+}) {
   const country = countryLabel(drama.originCountries);
   const year = yearOf(drama.firstAirDate);
   return (
     <button className="card" onClick={() => openDrama(drama.mediaType, drama.id)}>
       <div className="card-poster">
         <Poster path={drama.posterPath} alt={drama.title} />
+        {rank !== undefined && <span className="rank-badge">{rank}</span>}
         {drama.voteAverage > 0 && <span className="badge">★ {drama.voteAverage.toFixed(1)}</span>}
         {showType && drama.mediaType === 'movie' && <span className="badge badge-type">Фильм</span>}
       </div>
       <div className="card-title">{drama.title}</div>
       <div className="card-sub">{[year, country].filter(Boolean).join(' · ')}</div>
+      {note && <div className="card-note">{note}</div>}
     </button>
   );
 }
@@ -27,6 +41,8 @@ export function DramaGrid({
   showType = false,
   error = null,
   onRetry,
+  ranked = false,
+  notes,
 }: {
   items: Drama[];
   loading: boolean;
@@ -35,14 +51,22 @@ export function DramaGrid({
   showType?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  ranked?: boolean;
+  notes?: Map<string, string>;
 }) {
   const sentinel = useInfiniteScroll(onLoadMore, hasMore && !loading);
   const firstLoad = loading && items.length === 0;
   return (
     <>
       <div className="grid">
-        {items.map((d) => (
-          <DramaCard key={itemKey(d.mediaType, d.id)} drama={d} showType={showType} />
+        {items.map((d, i) => (
+          <DramaCard
+            key={itemKey(d.mediaType, d.id)}
+            drama={d}
+            showType={showType}
+            rank={ranked ? i + 1 : undefined}
+            note={notes?.get(itemKey(d.mediaType, d.id))}
+          />
         ))}
         {firstLoad && Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />)}
       </div>

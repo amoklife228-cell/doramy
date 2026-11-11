@@ -230,6 +230,76 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   return { items: r.results.map((d) => toDrama(p.mediaType, d)), page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
+/** discover по Азии с произвольными параметрами TMDB (для подборок на главной). */
+export async function discoverAsia(
+  mediaType: MediaType,
+  extra: Record<string, string>,
+  page: number,
+  signal?: AbortSignal,
+): Promise<Page<Drama>> {
+  const params: Record<string, string> = {
+    page: String(page),
+    include_adult: 'false',
+    with_origin_country: COUNTRIES.map((c) => c.code).join('|'),
+    ...extra,
+  };
+  if (mediaType === 'tv') params.include_null_first_air_dates = 'false';
+  const r = await fetchJSON<ListResponse>(`/discover/${mediaType}`, params, signal);
+  return { items: r.results.map((d) => toDrama(mediaType, d)), page: r.page, totalPages: Math.min(r.total_pages, 500) };
+}
+
+/**
+ * Мировой тренд недели, только азиатское. TMDB не фильтрует тренды по стране,
+ * поэтому одна наша страница — это три страницы TMDB, отсеянные на клиенте.
+ */
+export async function trendingAsia(
+  mediaType: MediaType,
+  page: number,
+  signal?: AbortSignal,
+  withoutGenres: number[] = [],
+): Promise<Page<Drama>> {
+  const pages = [page * 3 - 2, page * 3 - 1, page * 3];
+  const responses = await Promise.all(
+    pages.map((p) =>
+      fetchJSON<ListResponse>(`/trending/${mediaType}/week`, { page: String(p) }, signal).catch((e: Error) => {
+        if (e.name === 'AbortError') throw e;
+        return null;
+      }),
+    ),
+  );
+  const ok = responses.filter((r): r is ListResponse => r !== null);
+  if (ok.length === 0) throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
+  const items = ok
+    .flatMap((r) => r.results)
+    .filter((d) => !(d.genre_ids ?? []).some((g) => withoutGenres.includes(g)))
+    .map((d) => toDrama(mediaType, d))
+    .filter(isAsian);
+  const total = Math.max(...ok.map((r) => r.total_pages));
+  return { items, page, totalPages: Math.min(Math.ceil(total / 3), 10) };
+}
+
+/** Карточки по списку id (подборки редакции и премий): из кэша, остальное — запросом. Порядок сохраняется. */
+export async function detailsList(mediaType: MediaType, ids: number[], signal?: AbortSignal): Promise<Drama[]> {
+  const results = await Promise.all(
+    ids.map((id) => {
+      const cached = dramaCache.get(itemKey(mediaType, id));
+      if (cached) return Promise.resolve(cached);
+      return details(mediaType, id, signal)
+        .then((d) => {
+          dramaCache.set(itemKey(mediaType, id), d);
+          return d;
+        })
+        .catch((e: Error) => {
+          if (e.name === 'AbortError') throw e;
+          return null;
+        });
+    }),
+  );
+  const items = results.filter((d): d is Drama => d !== null);
+  if (items.length === 0 && ids.length > 0) throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
+  return items;
+}
+
 /** Поиск по названию. TMDB не фильтрует поиск по стране, поэтому отсеиваем на клиенте. */
 export async function search(
   mediaType: MediaType,

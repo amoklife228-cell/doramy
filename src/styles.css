@@ -1951,6 +1951,98 @@ code {
   animation: spin 0.9s linear infinite; /* @keyframes spin объявлен у .ptr-dot */
 }
 
+/* Ленты подборок на главной каталога */
+.home .pblock-head h2 {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.home .pblock-head {
+  margin-bottom: 0;
+  min-height: 44px;
+}
+
+.strip-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.strip-all svg {
+  width: 8px;
+  height: 14px;
+}
+
+.strip-poster-wrap {
+  position: relative;
+  display: block;
+  width: 110px;
+  height: 165px;
+}
+
+.strip-poster-wrap .badge {
+  left: 5px;
+  bottom: 5px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.strip-year {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.strip-note,
+.card-note {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--accent);
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-note {
+  margin-top: 2px;
+}
+
+/* Место в ТОП-500: крупная цифра в углу постера */
+.rank-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 0 0 10px 0;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.strip-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.collection-sub {
+  margin: -2px 0 16px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
 /* Пока подбирается новая подборка, старая чуть приглушена */
 .rec-strip[data-loading='true'] {
   opacity: 0.5;

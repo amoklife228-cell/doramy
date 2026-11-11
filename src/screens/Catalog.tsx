@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { CollectionStrip } from '../components/CollectionStrip';
 import { countActive, FilterSheet } from '../components/FilterSheet';
+import { HOME_BOTTOM, HOME_TOP } from '../lib/collections';
 import { InstallHint } from '../components/InstallHint';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
@@ -548,6 +550,16 @@ function CatalogHome({
         )}
       </section>
 
+      {HOME_TOP.map((id) => (
+        <CollectionStrip
+          key={`${mediaType}:${id}`}
+          id={id}
+          mediaType={mediaType}
+          refreshKey={refreshKey}
+          libraryKeys={libraryKeys}
+        />
+      ))}
+
       <section className="moods" style={moodBg ? { backgroundImage: `url(${backdropUrl(moodBg)})` } : undefined}>
         <div className="moods-inner">
           {MOODS.map((m) => (
@@ -557,6 +569,16 @@ function CatalogHome({
           ))}
         </div>
       </section>
+
+      {HOME_BOTTOM.map((id) => (
+        <CollectionStrip
+          key={`${mediaType}:${id}`}
+          id={id}
+          mediaType={mediaType}
+          refreshKey={refreshKey}
+          libraryKeys={libraryKeys}
+        />
+      ))}
     </div>
   );
 }
