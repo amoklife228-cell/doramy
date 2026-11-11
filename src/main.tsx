@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { applyAppearance, loadAppearance } from './lib/appearance';
+import { fixLibraryTitles } from './lib/db';
 import './styles.css';
 
 applyAppearance(loadAppearance());
@@ -19,6 +20,11 @@ registerSW({
     setInterval(check, 60 * 60 * 1000);
   },
 });
+
+// Через пару секунд после запуска, чтобы не мешать первой загрузке экрана.
+setTimeout(() => {
+  if (navigator.onLine) void fixLibraryTitles().catch(() => undefined);
+}, 2500);
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

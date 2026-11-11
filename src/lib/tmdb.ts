@@ -146,8 +146,116 @@ interface DetailDTO extends ListItemDTO {
   production_countries?: { iso_3166_1: string }[];
 }
 
+/* ---------- русские названия ----------
+ * Если у сериала нет русского перевода, TMDB с language=ru-RU отдаёт оригинал (연인, 深夜食堂).
+ * Тогда ищем: русский перевод → русское альтернативное название (их добавляют зрители) → английское.
+ * Найденное запоминается на устройстве, повторно не запрашивается.
+ */
+
+const CYRILLIC = /[А-Яа-яЁё]/;
+const TITLES_KEY = 'doramy.titles.v1';
+const TITLES_LIMIT = 4000;
+let titleCache: Record<string, string> | null = null;
+let titleSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function titles(): Record<string, string> {
+  if (!titleCache) {
+    try {
+      titleCache = JSON.parse(localStorage.getItem(TITLES_KEY) ?? '{}') as Record<string, string>;
+    } catch {
+      titleCache = {};
+    }
+  }
+  return titleCache;
+}
+
+function rememberTitle(key: string, title: string) {
+  const cache = titles();
+  cache[key] = title;
+  if (titleSaveTimer) clearTimeout(titleSaveTimer);
+  titleSaveTimer = setTimeout(() => {
+    try {
+      const keys = Object.keys(cache);
+      if (keys.length > TITLES_LIMIT) for (const k of keys.slice(0, keys.length - TITLES_LIMIT)) delete cache[k];
+      localStorage.setItem(TITLES_KEY, JSON.stringify(cache));
+    } catch {
+      // приватный режим: живём без кэша
+    }
+  }, 500);
+}
+
+/** Название требует поиска, если в нём нет кириллицы (оригинал на корейском, японском, английском…). */
+export function needsRussianTitle(title: string): boolean {
+  return !CYRILLIC.test(title);
+}
+
+interface AltTitle {
+  iso_3166_1: string;
+  title: string;
+}
+
+interface TitlesDTO {
+  alternative_titles?: { results?: AltTitle[]; titles?: AltTitle[] };
+  translations?: { translations?: { iso_639_1: string; data?: { name?: string; title?: string } }[] };
+}
+
+/** Лучшее название из ответа с append_to_response=alternative_titles,translations; null — ничего лучше нет. */
+function pickTitle(d: TitlesDTO): string | null {
+  const tr = d.translations?.translations ?? [];
+  const ru = tr.find((t) => t.iso_639_1 === 'ru')?.data;
+  const ruName = (ru?.name || ru?.title || '').trim();
+  if (ruName && CYRILLIC.test(ruName)) return ruName;
+  const alts = d.alternative_titles?.results ?? d.alternative_titles?.titles ?? [];
+  const ruAlt = alts.find((a) => a.iso_3166_1 === 'RU' && CYRILLIC.test(a.title))?.title.trim();
+  if (ruAlt) return ruAlt;
+  const en = tr.find((t) => t.iso_639_1 === 'en')?.data;
+  const enName = (en?.name || en?.title || '').trim();
+  return enName || null;
+}
+
+async function mapLimit<T, R>(list: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(list.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const i = next++;
+      out[i] = await fn(list[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+  return out;
+}
+
+/** Подставить русские (или хотя бы английские) названия там, где TMDB отдал оригинал. */
+export async function localizeTitles(items: Drama[], signal?: AbortSignal): Promise<Drama[]> {
+  const cache = titles();
+  const missing = items.filter((d) => needsRussianTitle(d.title) && cache[itemKey(d.mediaType, d.id)] === undefined);
+  if (missing.length) {
+    await mapLimit(missing.slice(0, 30), 6, async (d) => {
+      try {
+        const r = await fetchJSON<TitlesDTO>(
+          `/${d.mediaType}/${d.id}`,
+          { append_to_response: 'alternative_titles,translations' },
+          signal,
+        );
+        // Пустая строка = искали, лучше нет; повторно не ищем.
+        rememberTitle(itemKey(d.mediaType, d.id), pickTitle(r) ?? '');
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') throw e;
+      }
+    });
+  }
+  return items.map((d) => {
+    const better = cache[itemKey(d.mediaType, d.id)];
+    return better && needsRussianTitle(d.title) ? { ...d, title: better } : d;
+  });
+}
+
 function toDrama(mediaType: MediaType, d: ListItemDTO): Drama {
-  const title = d.name || d.title || d.original_name || d.original_title || 'Без названия';
+  const fromApi = d.name || d.title || d.original_name || d.original_title || 'Без названия';
+  // Уже найденное русское название подставляем сразу, без запроса.
+  const known = needsRussianTitle(fromApi) ? titles()[itemKey(mediaType, d.id)] : undefined;
+  const title = known || fromApi;
   const langCountry = d.original_language ? LANG_TO_COUNTRY[d.original_language] : undefined;
   const countries = d.origin_country?.length ? d.origin_country : langCountry ? [langCountry] : [];
   return {
@@ -227,7 +335,8 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   if (p.sort === 'newest' && upcomingMovie) params.sort_by = 'primary_release_date.asc';
 
   const r = await fetchJSON<ListResponse>(`/discover/${p.mediaType}`, params, signal);
-  return { items: r.results.map((d) => toDrama(p.mediaType, d)), page: r.page, totalPages: Math.min(r.total_pages, 500) };
+  const items = await localizeTitles(r.results.map((d) => toDrama(p.mediaType, d)), signal);
+  return { items, page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
 /** discover по Азии с произвольными параметрами TMDB (для подборок на главной). */
@@ -245,7 +354,8 @@ export async function discoverAsia(
   };
   if (mediaType === 'tv') params.include_null_first_air_dates = 'false';
   const r = await fetchJSON<ListResponse>(`/discover/${mediaType}`, params, signal);
-  return { items: r.results.map((d) => toDrama(mediaType, d)), page: r.page, totalPages: Math.min(r.total_pages, 500) };
+  const items = await localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+  return { items, page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
 /**
@@ -269,11 +379,14 @@ export async function trendingAsia(
   );
   const ok = responses.filter((r): r is ListResponse => r !== null);
   if (ok.length === 0) throw new TMDBError('Нет соединения с TMDB. Проверьте интернет.');
-  const items = ok
-    .flatMap((r) => r.results)
-    .filter((d) => !(d.genre_ids ?? []).some((g) => withoutGenres.includes(g)))
-    .map((d) => toDrama(mediaType, d))
-    .filter(isAsian);
+  const items = await localizeTitles(
+    ok
+      .flatMap((r) => r.results)
+      .filter((d) => !(d.genre_ids ?? []).some((g) => withoutGenres.includes(g)))
+      .map((d) => toDrama(mediaType, d))
+      .filter(isAsian),
+    signal,
+  );
   const total = Math.max(...ok.map((r) => r.total_pages));
   return { items, page, totalPages: Math.min(Math.ceil(total / 3), 10) };
 }
@@ -316,11 +429,19 @@ export async function search(
   let items = r.results.map((d) => toDrama(mediaType, d));
   if (country === '') items = items.filter(isAsian);
   else if (country !== WORLD) items = items.filter((d) => d.originCountries.includes(country));
+  items = await localizeTitles(items, signal);
   return { items, page: r.page, totalPages: Math.min(r.total_pages, 500) };
 }
 
 export async function details(mediaType: MediaType, id: number, signal?: AbortSignal): Promise<Drama> {
-  const d = await fetchJSON<DetailDTO>(`/${mediaType}/${id}`, {}, signal);
+  // Переводы и альтернативные названия в том же запросе: нет русского — найдём замену без лишнего обращения.
+  const d = await fetchJSON<DetailDTO & TitlesDTO>(
+    `/${mediaType}/${id}`,
+    { append_to_response: 'alternative_titles,translations' },
+    signal,
+  );
+  const apiTitle = d.name || d.title || '';
+  if (apiTitle && needsRussianTitle(apiTitle)) rememberTitle(itemKey(mediaType, id), pickTitle(d) ?? '');
   const base = toDrama(mediaType, d);
   const produced = d.production_countries?.map((c) => c.iso_3166_1) ?? [];
   return {
@@ -389,7 +510,7 @@ export async function recommendations(
 ): Promise<Drama[]> {
   const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: String(page) }, signal);
   if (r.results.length === 0 && page > 1) return recommendations(mediaType, id, signal, 1);
-  return r.results.map((d) => toDrama(mediaType, d));
+  return localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
 }
 
 /** Случайная популярная запись: случайная страница из первых 15 (но не дальше последней) и случайный элемент на ней. */

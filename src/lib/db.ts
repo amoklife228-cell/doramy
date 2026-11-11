@@ -1,7 +1,9 @@
 import Dexie, { type Table } from 'dexie';
+import { localizeTitles, needsRussianTitle } from './tmdb';
 import {
   itemKey,
   minutesPerUnit,
+  savedToDrama,
   todayKey,
   type ActivityDay,
   type Drama,
@@ -178,6 +180,25 @@ export async function refreshMetadata(drama: Drama): Promise<void> {
     runtime: drama.runtime ?? existing.runtime,
     episodeRuntime: drama.episodeRuntime ?? existing.episodeRuntime,
   });
+}
+
+/**
+ * Записи, добавленные с оригинальным названием (연인, 深夜食堂), получают русское или английское.
+ * Меняется только title на этом устройстве, время правки не трогается.
+ */
+export async function fixLibraryTitles(): Promise<number> {
+  const all = await db.items.toArray();
+  const need = all.filter((s) => needsRussianTitle(s.title));
+  if (need.length === 0) return 0;
+  const fixed = await localizeTitles(need.map(savedToDrama));
+  let changed = 0;
+  for (let i = 0; i < need.length; i++) {
+    if (fixed[i].title !== need[i].title) {
+      await db.items.update(need[i].key, { title: fixed[i].title });
+      changed++;
+    }
+  }
+  return changed;
 }
 
 export async function exportLibrary(): Promise<string> {
