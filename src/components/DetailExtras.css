@@ -1,0 +1,35 @@
+/* «В ролях»: актёр — кнопка, открывает его страницу. */
+button.cast-item {
+  display: block;
+  padding: 0;
+  color: inherit;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button.cast-item .cast-photo {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+button.cast-item:active .cast-photo {
+  transform: scale(0.94);
+}
+
+button.cast-item:focus-visible {
+  outline: none;
+}
+
+button.cast-item:focus-visible .cast-photo {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+@media (min-width: 1024px) {
+  button.cast-item:hover .cast-photo {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 10px 24px -8px rgba(229, 32, 46, 0.6);
+  }
+
+  button.cast-item:hover .cast-name {
+    color: var(--accent);
+  }
+}

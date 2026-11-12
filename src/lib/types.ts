@@ -60,7 +60,14 @@ export interface SavedDrama {
    * поэтому «минус, потом плюс» не засчитывает ту же серию второй раз. Нет — равно episodesWatched.
    */
   countedUnits?: number;
+  /**
+   * Отмеченные в списке серии: 's1e3'. Нет — просмотрены первые episodesWatched по порядку.
+   * episodesWatched главнее: набор приводится к нему (правила в lib/episodes.ts).
+   */
+  watchedEpisodes?: string[];
   notes: string;
+  /** Короткий отзыв рядом с оценкой (до 500 символов). */
+  review?: string;
   isFavorite: boolean;
   addedAt: number;
   updatedAt: number;

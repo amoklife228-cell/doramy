@@ -40,7 +40,14 @@ export function FeaturedHero({
     loadCollectionItems('trending', mediaType, c.signal)
       .then((list) => {
         // Нужны кадры; с описанием — вперёд, без него — в конец.
-        const withArt = list.filter((d) => d.backdropPath);
+        // Тренды склеиваются из нескольких страниц TMDB, и сериал может попасться дважды.
+        const seen = new Set<string>();
+        const withArt = list.filter((d) => {
+          const k = itemKey(d.mediaType, d.id);
+          if (!d.backdropPath || seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
         const sorted = [...withArt.filter((d) => d.overview), ...withArt.filter((d) => !d.overview)];
         setItems(sorted.slice(0, SLIDES));
       })

@@ -1,0 +1,501 @@
+/* ---------- Страница актёра ---------- */
+
+.person-content {
+  padding-top: 4px;
+}
+
+.person-nav-title {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.person-nav-title[data-show='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Шапка: на телефоне всё по центру, фото круглое. */
+.person-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 6px 0 4px;
+}
+
+/* Мягкое красное свечение за фото: страница не выглядит пустой и чёрной. */
+.person-hero::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  width: 320px;
+  height: 260px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(229, 32, 46, 0.28), transparent);
+  /* Верх прокрутки обрезает свечение — гасим его к краю, чтобы не было видимой границы. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 40px, #000 110px);
+  mask-image: linear-gradient(180deg, transparent 40px, #000 110px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.person-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.person-photo-btn {
+  display: block;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.person-photo-btn:disabled {
+  cursor: default;
+}
+
+.person-photo {
+  display: block;
+  width: 152px;
+  height: 152px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  background: var(--bg-elev);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08), 0 14px 36px -10px rgba(229, 32, 46, 0.55), 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+
+.person-photo-btn:active:not(:disabled) .person-photo {
+  transform: scale(0.97);
+}
+
+.person-photo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 44px;
+  font-weight: 700;
+}
+
+.person-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.person-role {
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(229, 32, 46, 0.16);
+  color: #ff6b75;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.person-name {
+  margin-top: 8px;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.person-alt {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.person-meta {
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: rgba(235, 235, 245, 0.82);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.person-stats {
+  margin: 16px 0 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.person-stat {
+  flex: 1;
+  max-width: 124px;
+  padding: 10px 6px 9px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+}
+
+.person-stat dt {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.person-stat dd {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.person-star {
+  color: var(--star);
+}
+
+/* Биография: свёрнута до пяти строк. */
+.person-block {
+  margin-top: 26px;
+}
+
+.person-bio-note {
+  margin: -2px 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.person-bio {
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(235, 235, 245, 0.92);
+}
+
+.person-bio p {
+  margin: 0 0 10px;
+}
+
+.person-bio p:last-child {
+  margin-bottom: 0;
+}
+
+.person-bio[data-open='false'] {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* В свёрнутом виде абзацы идут подряд, иначе пять строк съедают отступы. */
+.person-bio[data-open='false'] p {
+  display: inline;
+  margin: 0;
+}
+
+.person-bio[data-open='false'] p + p::before {
+  content: ' ';
+}
+
+.person-more {
+  margin-top: 6px;
+  padding: 4px 0;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Известные работы и фото — ленты. */
+.person-known .strip-year {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.person-photos {
+  gap: 8px;
+}
+
+.person-photos-item {
+  flex: none;
+  width: 92px;
+  height: 138px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+
+.person-photos-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-photos-item:active img {
+  transform: scale(0.97);
+}
+
+/* Фильмография */
+.person-films-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.person-films-head h2 {
+  margin: 0;
+}
+
+.person-shows {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.person-kinds {
+  margin-bottom: 16px;
+}
+
+.person-kinds button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.person-kind-count {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.person-year-head {
+  margin: 4px 0 12px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.grid + .sentinel + .person-year-head {
+  margin-top: 28px;
+}
+
+.person-films-empty {
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* Статус в библиотеке — в углу постера. */
+.card-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  max-width: calc(100% - 12px);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.card-mark::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #4ade80;
+  vertical-align: 1px;
+}
+
+.person-skeleton .person-photo {
+  box-shadow: none;
+}
+
+.person-skeleton .person-head {
+  gap: 0;
+}
+
+/* ---------- Компьютер ---------- */
+
+@media (min-width: 1024px) {
+  .detail.person-page.person-page:has(.ios-page) {
+    --page-max: 1240px;
+  }
+
+  .person-content {
+    padding-top: 12px;
+  }
+
+  .person-hero {
+    flex-direction: row;
+    align-items: flex-end;
+    text-align: left;
+    gap: 40px;
+    padding: 8px 0 6px;
+  }
+
+  .person-hero::before {
+    display: none;
+  }
+
+  .person-photo-btn {
+    border-radius: 22px;
+  }
+
+  .person-photo {
+    width: 236px;
+    height: 354px;
+    border-radius: 22px;
+    object-position: 50% 30%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 60px -20px rgba(0, 0, 0, 0.85), 0 18px 48px -18px rgba(229, 32, 46, 0.55);
+  }
+
+  .person-photo-btn:hover:not(:disabled) .person-photo {
+    transform: translateY(-3px);
+  }
+
+  .person-photo-empty {
+    font-size: 64px;
+  }
+
+  .person-head {
+    align-items: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .person-role {
+    font-size: 14px;
+  }
+
+  .person-name {
+    margin-top: 12px;
+    font-size: 52px;
+    letter-spacing: -0.03em;
+  }
+
+  .person-alt {
+    margin-top: 8px;
+    font-size: 17px;
+  }
+
+  .person-meta {
+    margin-top: 14px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 0;
+    font-size: 16px;
+  }
+
+  .person-meta > span + span::before {
+    content: '·';
+    margin: 0 10px;
+    color: var(--muted);
+  }
+
+  .person-stats {
+    justify-content: flex-start;
+    gap: 12px;
+    margin-top: 22px;
+  }
+
+  .person-stat {
+    flex: none;
+    min-width: 130px;
+    max-width: none;
+    padding: 12px 18px 11px;
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .person-stat dt {
+    font-size: 24px;
+  }
+
+  .person-stat dd {
+    font-size: 13px;
+  }
+
+  .person-block {
+    margin-top: 40px;
+  }
+
+  .person-block > h2,
+  .person-films-head h2 {
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+  }
+
+  .person-block > h2::before,
+  .person-films-head h2::before {
+    content: '';
+    flex: none;
+    width: 4px;
+    height: 0.9em;
+    margin-right: 11px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #ff6f9c, #e5202e);
+    box-shadow: 0 0 12px rgba(229, 32, 46, 0.6);
+  }
+
+  .person-bio,
+  .person-bio-note {
+    max-width: 860px;
+  }
+
+  .person-bio {
+    font-size: 17px;
+  }
+
+  .person-more:hover {
+    text-decoration: underline;
+  }
+
+  .person-photos-item {
+    width: 120px;
+    height: 180px;
+    transition: transform 0.15s ease;
+  }
+
+  .person-photos-item:hover {
+    transform: translateY(-3px);
+  }
+
+  .person-kinds {
+    width: 420px;
+    margin-bottom: 22px;
+  }
+
+  .person-shows:hover {
+    filter: brightness(1.2);
+  }
+
+  .person-year-head {
+    font-size: 24px;
+  }
+}

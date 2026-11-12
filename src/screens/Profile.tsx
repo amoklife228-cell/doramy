@@ -2,9 +2,10 @@ import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { BottomSheet } from '../components/BottomSheet';
-import { IconColors, IosRow, IosSection } from '../components/IosList';
+import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
+import { WrappedBanner } from '../components/WrappedBanner';
 import { db } from '../lib/db';
 import { useDesktop } from '../lib/media';
 import { navigate, openDrama, openSettings } from '../lib/router';
@@ -73,6 +74,8 @@ export function Profile({ session }: { session: Session | null | undefined }) {
           <Counter value={stats.days} label={plural(stats.days, 'день', 'дня', 'дней')} />
         </dl>
 
+        <WrappedBanner items={items} activity={activity} />
+
         <section className="pblock">
           <div className="pblock-head">
             <h2>Статистика по дням</h2>
@@ -127,6 +130,21 @@ export function Profile({ session }: { session: Session | null | undefined }) {
               value={`${stats.days} ${plural(stats.days, 'день', 'дня', 'дней')}`}
               chevron
               onClick={() => go('/history')}
+            />
+            <IosRow
+              icon={RowIcons.sparkles}
+              iconColor={IconColors.purple}
+              label="Итоги года"
+              value={String(new Date().getFullYear())}
+              chevron
+              onClick={() => go('/wrapped')}
+            />
+            <IosRow
+              icon={RowIcons.calendar}
+              iconColor={IconColors.green}
+              label="Календарь"
+              chevron
+              onClick={() => go('/calendar')}
             />
             <IosRow icon={MenuIcons.gear} iconColor={IconColors.gray} label="Настройки" chevron onClick={() => go('/settings')} />
           </IosSection>

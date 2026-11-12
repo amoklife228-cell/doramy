@@ -178,10 +178,24 @@ export const RowIcons = {
       <path d="M12 11v5M12 8h.01" />
     </svg>
   ),
+  calendar: (
+    <svg viewBox="0 0 24 24" {...s}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+      <path d="M8 13.5h.01M12 13.5h.01M16 13.5h.01M8 17h.01M12 17h.01" strokeWidth={2.6} />
+    </svg>
+  ),
   film: (
     <svg viewBox="0 0 24 24" {...s}>
       <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
       <path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4" />
+    </svg>
+  ),
+  /** «Итоги года»: вспышка с искрой. */
+  sparkles: (
+    <svg viewBox="0 0 24 24" {...s}>
+      <path d="M10 3.5l1.9 5.1 5.1 1.9-5.1 1.9L10 17.5l-1.9-5.1L3 10.5l5.1-1.9z" />
+      <path d="M17.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
     </svg>
   ),
 };

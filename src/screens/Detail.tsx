@@ -4,14 +4,18 @@ import { Ambient } from '../components/Ambient';
 import { CastStrip, ShareButton, SimilarStrip } from '../components/DetailExtras';
 import { Poster } from '../components/Poster';
 import { PosterViewer } from '../components/PosterViewer';
+import { ReviewField } from '../components/ReviewField';
+import { SoundtrackButton } from '../components/SoundtrackButton';
 import { TrailerBlock } from '../components/TrailerBlock';
 import { EmptyState, NotConfigured } from '../components/DramaGrid';
+import { EpisodeList, useOutline } from '../components/EpisodeList';
 import { IosRow, IosSection, IosSwitch } from '../components/IosList';
 import { NavBar } from '../components/NavBar';
 import { addToLibrary, db, refreshMetadata, removeEntry, updateEntry } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { useDesktop } from '../lib/media';
 import { goBack } from '../lib/router';
+import { countPatch, episodeOrder, stepWatched, type ShowOutline } from '../lib/episodes';
 import { details, dramaCache } from '../lib/tmdb';
 import {
   autoKindOf,
@@ -77,6 +81,11 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
   const desktop = useDesktop();
   // На компьютере шапка лежит поверх кадра и темнеет, когда страницу прокрутили.
   const [scrolled, setScrolled] = useState(false);
+  // Сезоны сериала: список «Серии» и порядок серий для «− +».
+  const outline = useOutline(isMovie ? null : id, configured);
+  const episodes = drama && !isMovie && (
+    <EpisodeList drama={drama} entry={entry} outline={outline} desktop={desktop} />
+  );
 
   const info = drama && (
     <IosSection
@@ -145,13 +154,18 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
                   <p className="overview">{drama.overview}</p>
                 </section>
               )}
+              {episodes}
               <TrailerBlock mediaType={mediaType} id={id} enabled={configured} />
               <CastStrip mediaType={mediaType} id={id} enabled={configured} />
               <SimilarStrip mediaType={mediaType} id={id} enabled={configured} libraryKeys={libraryKeys} />
             </div>
             <aside className="detail-side">
               {entry && (
-                <EntryEditor entry={entry} episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)} />
+                <EntryEditor
+                  entry={entry}
+                  episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)}
+                  outline={outline}
+                />
               )}
               {info}
             </aside>
@@ -162,7 +176,11 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
           <Hero drama={drama} />
 
           {loadingEntry ? null : entry ? (
-            <EntryEditor entry={entry} episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)} />
+            <EntryEditor
+              entry={entry}
+              episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)}
+              outline={outline}
+            />
           ) : (
             <AddButtons drama={drama} />
           )}
@@ -175,6 +193,7 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
           >
             Найти в интернете
           </a>
+          <SoundtrackButton drama={drama} wide />
 
           <TrailerBlock mediaType={mediaType} id={id} enabled={configured} />
 
@@ -184,6 +203,8 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
               <p className="overview">{drama.overview}</p>
             </section>
           )}
+
+          {episodes}
 
           <CastStrip mediaType={mediaType} id={id} enabled={configured} />
           <SimilarStrip mediaType={mediaType} id={id} enabled={configured} libraryKeys={libraryKeys} />
@@ -267,6 +288,7 @@ function DeskHero({
             >
               Найти в интернете
             </a>
+            <SoundtrackButton drama={drama} />
           </div>
         </div>
       </div>
@@ -343,7 +365,16 @@ function statusesFor(isMovie: boolean) {
   return isMovie ? STATUSES.filter((s) => s.id !== 'watching' && s.id !== 'onHold') : STATUSES;
 }
 
-function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount: number | undefined }) {
+function EntryEditor({
+  entry,
+  episodeCount,
+  outline = null,
+}: {
+  entry: SavedDrama;
+  episodeCount: number | undefined;
+  /** Сезоны сериала: по ним «− +» снимают и ставят отметки в списке «Серии» (lib/episodes.ts). */
+  outline?: ShowOutline | null;
+}) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [notes, setNotes] = useState(entry.notes);
   const isMovie = entry.mediaType === 'movie';
@@ -358,7 +389,11 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
     void updateEntry(p.key, { notes: p.notes });
   };
   useEffect(() => {
-    if (notes === entry.notes) return;
+    // Вернули текст к сохранённому — сохранять нечего (иначе потом ушёл бы промежуточный вариант).
+    if (notes === entry.notes) {
+      pending.current = null;
+      return;
+    }
     pending.current = { key: entry.key, notes };
     const t = setTimeout(flush, 500);
     return () => clearTimeout(t);
@@ -374,16 +409,15 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
 
   const setStatus = (status: WatchStatus) => {
     const patch: Partial<SavedDrama> = { status };
-    if (status === 'completed' && episodeCount) patch.episodesWatched = episodeCount;
+    if (status === 'completed' && episodeCount) {
+      Object.assign(patch, countPatch(entry, episodeCount, outline ? episodeOrder(outline) : null));
+    }
     void updateEntry(entry.key, patch);
   };
 
+  // «+» отмечает следующую неотмеченную серию, «−» снимает последнюю отмеченную (см. lib/episodes.ts).
   const setEpisodes = (n: number) => {
-    const max = episodeCount ?? 9999;
-    const value = Math.max(0, Math.min(max, n));
-    const patch: Partial<SavedDrama> = { episodesWatched: value };
-    if (episodeCount && value >= episodeCount && entry.status === 'watching') patch.status = 'completed';
-    void updateEntry(entry.key, patch);
+    void stepWatched(entry.key, n - entry.episodesWatched, outline ? episodeOrder(outline) : null, episodeCount);
   };
 
   const autoKind = autoKindOf(entry);
@@ -486,6 +520,8 @@ function EntryEditor({ entry, episodeCount }: { entry: SavedDrama; episodeCount:
           </select>
         </IosRow>
       </IosSection>
+
+      <ReviewField entry={entry} />
 
       <IosSection title="Заметки" footer="Сохраняется автоматически.">
         <IosRow className="ios-row-stack">

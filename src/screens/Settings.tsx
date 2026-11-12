@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { db, exportLibrary, importLibrary } from '../lib/db';
 import { goBack } from '../lib/router';
+import { currentIosGap } from '../lib/viewportFix';
 import {
   applyAppearance,
   BOTTOM_OFFSET_RANGE,
@@ -35,6 +36,7 @@ function diagnostics(): string {
     vv ? `видимая область ${Math.round(vv.width)}×${Math.round(vv.height)}` : '',
     `экран ${screen.width}×${screen.height}`,
     `нижний отступ ${safeBottom}`,
+    `исправление полосы ${currentIosGap()}`,
     `iOS ${/OS (\d+)_/.exec(navigator.userAgent)?.[1] ?? '?'}`,
   ]
     .filter(Boolean)

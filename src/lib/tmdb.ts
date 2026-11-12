@@ -134,7 +134,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-async function fetchJSON<T>(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<T> {
+export async function fetchJSON<T>(path: string, params: Record<string, string>, signal?: AbortSignal): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     await acquire(signal);
     let result: { retryAfter: number } | { value: T };
@@ -187,7 +187,7 @@ async function fetchOnce<T>(
 }
 
 // Общий DTO для списков сериалов и фильмов: у сериалов name/first_air_date, у фильмов title/release_date.
-interface ListItemDTO {
+export interface ListItemDTO {
   id: number;
   name?: string;
   original_name?: string;
@@ -205,7 +205,7 @@ interface ListItemDTO {
   genre_ids?: number[];
 }
 
-interface ListResponse {
+export interface ListResponse {
   page: number;
   results: ListItemDTO[];
   total_pages: number;
@@ -357,7 +357,7 @@ export async function localizeTitles(items: Drama[], signal?: AbortSignal, limit
   });
 }
 
-function toDrama(mediaType: MediaType, d: ListItemDTO): Drama {
+export function toDrama(mediaType: MediaType, d: ListItemDTO): Drama {
   const fromApi = d.name || d.title || d.original_name || d.original_title || 'Без названия';
   // Уже найденное русское название подставляем сразу, без запроса.
   const known = needsRussianTitle(fromApi) ? knownTitle(itemKey(mediaType, d.id)) : undefined;
@@ -380,7 +380,7 @@ function toDrama(mediaType: MediaType, d: ListItemDTO): Drama {
   };
 }
 
-function isAsian(d: Drama): boolean {
+export function isAsian(d: Drama): boolean {
   return d.originCountries.some((c) => COUNTRY_CODES.has(c));
 }
 
@@ -501,6 +501,8 @@ export async function trendingAsia(
   const items = await localizeTitles(
     ok
       .flatMap((r) => r.results)
+      // Соседние страницы трендов TMDB иногда пересекаются — без повторов.
+      .filter((d, i, all) => all.findIndex((x) => x.id === d.id) === i)
       .filter((d) => !(d.genre_ids ?? []).some((g) => withoutGenres.includes(g)))
       .map((d) => toDrama(mediaType, d))
       .filter(isAsian),

@@ -33,7 +33,8 @@ export function Genre({ kind: routeKind, slug, sort }: { kind: LibraryKind; slug
   const tmdbGenre = genre ? genreFor(genre, kind) : null;
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goBack();
+    // Поверх открыта карточка — Escape закрывает её, а не этот список.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && document.querySelectorAll('.detail').length <= 1 && goBack();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);

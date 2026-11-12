@@ -8,6 +8,7 @@ export function DramaCard({
   showType = false,
   rank,
   note,
+  mark,
 }: {
   drama: Drama;
   showType?: boolean;
@@ -15,6 +16,8 @@ export function DramaCard({
   rank?: number;
   /** Подпись под карточкой, например награда. */
   note?: string;
+  /** Пометка в углу постера, например статус в библиотеке. */
+  mark?: string;
 }) {
   const country = countryLabel(drama.originCountries);
   const year = yearOf(drama.firstAirDate);
@@ -25,6 +28,7 @@ export function DramaCard({
         {rank !== undefined && <span className="rank-badge">{rank}</span>}
         {drama.voteAverage > 0 && <span className="badge">★ {drama.voteAverage.toFixed(1)}</span>}
         {showType && drama.mediaType === 'movie' && <span className="badge badge-type">Фильм</span>}
+        {mark && <span className="card-mark">{mark}</span>}
       </div>
       <div className="card-title">{drama.title}</div>
       <div className="card-sub">{[year, country].filter(Boolean).join(' · ')}</div>
@@ -43,6 +47,7 @@ export function DramaGrid({
   onRetry,
   ranked = false,
   notes,
+  marks,
   placeholder = false,
 }: {
   items: Drama[];
@@ -54,6 +59,8 @@ export function DramaGrid({
   onRetry?: () => void;
   ranked?: boolean;
   notes?: Map<string, string>;
+  /** Пометки в углу постера по ключу записи (статус в библиотеке). */
+  marks?: Map<string, string>;
   /**
    * Показывать заготовки карточек, хотя запрос не идёт: страница целиком отсеялась фильтром,
    * а сторож сейчас догрузит следующую. Влияет только на вид, не на догрузку.
@@ -72,6 +79,7 @@ export function DramaGrid({
             showType={showType}
             rank={ranked ? i + 1 : undefined}
             note={notes?.get(itemKey(d.mediaType, d.id))}
+            mark={marks?.get(itemKey(d.mediaType, d.id))}
           />
         ))}
         {firstLoad && Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />)}

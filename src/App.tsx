@@ -1,5 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { useRoute, type Route, type Tab } from './lib/router';
+import { lazy, Suspense, useState } from 'react';
+import { historyIndex } from './lib/historyIndex';
+import { advance, initialNav, layers } from './lib/overlayStack';
+import { useRoute, type Tab } from './lib/router';
 import { useSession } from './lib/supabase';
 import { useSyncLifecycle } from './lib/sync';
 import { itemKey } from './lib/types';
@@ -13,9 +15,12 @@ import { Profile } from './screens/Profile';
 const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
 const Notes = lazy(() => import('./screens/Notes').then((m) => ({ default: m.Notes })));
 const History = lazy(() => import('./screens/History').then((m) => ({ default: m.History })));
+const Calendar = lazy(() => import('./screens/Calendar').then((m) => ({ default: m.Calendar })));
+const Wrapped = lazy(() => import('./screens/Wrapped').then((m) => ({ default: m.Wrapped })));
 const Detail = lazy(() => import('./screens/Detail').then((m) => ({ default: m.Detail })));
 const Collection = lazy(() => import('./screens/Collection').then((m) => ({ default: m.Collection })));
 const Genre = lazy(() => import('./screens/Genre').then((m) => ({ default: m.Genre })));
+const Person = lazy(() => import('./screens/Person').then((m) => ({ default: m.Person })));
 
 /** Пока чанк оверлея грузится — пустой чёрный экран того же слоя, без белой вспышки. */
 const overlayFallback = <div className="detail" />;
@@ -25,16 +30,19 @@ export default function App() {
   const session = useSession();
   useSyncLifecycle(!!session);
 
-  // Подборка или жанр остаются под открытой карточкой: «Назад» вернёт к тому же месту списка, без перезагрузки.
-  const [kept, setKept] = useState<Pick<Route, 'collection' | 'genre'> | null>(null);
-  useEffect(() => {
-    if (route.collection || route.genre) setKept({ collection: route.collection, genre: route.genre });
-    else if (!route.detail) setKept(null);
-  }, [route]);
-  const collection = route.collection ?? (route.detail ? (kept?.collection ?? null) : null);
-  const genre = route.genre ?? (route.detail ? (kept?.genre ?? null) : null);
+  // Подборка, жанр или страница актёра остаются под открытой с них карточкой: «Назад» вернёт к тому же
+  // месту списка, без перезагрузки (см. lib/overlayStack). Считается прямо при отрисовке, без лишнего кадра.
+  const idx = historyIndex();
+  const [nav, setNav] = useState(() => initialNav(route, idx));
+  let current = nav;
+  if (nav.route !== route) {
+    current = advance(nav, route, idx);
+    setNav(current);
+  }
+  const { collection, genre, person, detailBelow, detailTop } = layers(current);
 
-  const overlayOpen = route.detail !== null || route.overlay !== null || collection !== null || genre !== null;
+  const overlayOpen =
+    route.detail !== null || route.overlay !== null || collection !== null || genre !== null || person !== null;
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>
@@ -63,6 +71,16 @@ export default function App() {
           <History />
         </Suspense>
       )}
+      {route.overlay === 'calendar' && (
+        <Suspense fallback={overlayFallback}>
+          <Calendar />
+        </Suspense>
+      )}
+      {route.overlay === 'wrapped' && (
+        <Suspense fallback={overlayFallback}>
+          <Wrapped />
+        </Suspense>
+      )}
       {collection && (
         <Suspense fallback={overlayFallback}>
           <Collection
@@ -77,12 +95,26 @@ export default function App() {
           <Genre key={genre.slug} kind={genre.kind} slug={genre.slug} sort={genre.sort} />
         </Suspense>
       )}
-      {route.detail && (
+      {detailBelow && (
         <Suspense fallback={overlayFallback}>
           <Detail
-            key={itemKey(route.detail.mediaType, route.detail.id)}
-            mediaType={route.detail.mediaType}
-            id={route.detail.id}
+            key={itemKey(detailBelow.mediaType, detailBelow.id)}
+            mediaType={detailBelow.mediaType}
+            id={detailBelow.id}
+          />
+        </Suspense>
+      )}
+      {person && (
+        <Suspense fallback={overlayFallback}>
+          <Person key={person.id} id={person.id} />
+        </Suspense>
+      )}
+      {detailTop && (
+        <Suspense fallback={overlayFallback}>
+          <Detail
+            key={itemKey(detailTop.mediaType, detailTop.id)}
+            mediaType={detailTop.mediaType}
+            id={detailTop.id}
           />
         </Suspense>
       )}

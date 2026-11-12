@@ -245,7 +245,11 @@ export async function importLibrary(json: string): Promise<number> {
       userRating: typeof raw.userRating === 'number' ? raw.userRating : null,
       episodesWatched: raw.episodesWatched ?? 0,
       countedUnits: typeof raw.countedUnits === 'number' ? raw.countedUnits : undefined,
+      watchedEpisodes: Array.isArray(raw.watchedEpisodes)
+        ? raw.watchedEpisodes.filter((c): c is string => typeof c === 'string' && /^s\d+e\d+$/.test(c))
+        : undefined,
       notes: raw.notes ?? '',
+      review: typeof raw.review === 'string' ? raw.review : undefined,
       isFavorite: !!raw.isFavorite,
       addedAt: raw.addedAt ?? now,
       updatedAt: raw.updatedAt ?? now,

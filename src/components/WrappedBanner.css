@@ -1,0 +1,157 @@
+/* Баннер «Ваш 2026 в дорамах» в профиле. */
+
+.wrb {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 148px;
+  margin: 18px 0 4px;
+  padding: 0;
+  border-radius: 20px;
+  text-align: left;
+  color: #fff;
+  background: radial-gradient(90% 120% at 100% 0%, rgba(255, 176, 46, 0.75), transparent 55%),
+    radial-gradient(80% 120% at 0% 100%, rgba(124, 58, 237, 0.85), transparent 60%),
+    linear-gradient(125deg, #e5202e 0%, #b0177a 55%, #4c1d95 100%);
+  box-shadow: 0 18px 40px -16px rgba(229, 32, 46, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  -webkit-touch-callout: none;
+  transition: transform 0.15s ease;
+}
+
+.wrb:active {
+  transform: scale(0.985);
+}
+
+.wrb:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.wrb-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+}
+
+.wrb-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 0 18px 18px;
+}
+
+.wrb-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.wrb-title {
+  font-size: 23px;
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.wrb-sub {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.88;
+}
+
+.wrb-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 6px 12px 6px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.wrb-cta svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.wrb-posters {
+  position: relative;
+  flex: none;
+  width: 128px;
+}
+
+.wrb-poster {
+  position: absolute;
+  top: 50%;
+  right: calc(8px + var(--i) * 26px);
+  width: 66px;
+  height: 99px;
+  margin-top: -50px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 22px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.16);
+  transform: rotate(calc(10deg - var(--i) * 9deg)) translateY(calc(var(--i) * 6px));
+  z-index: calc(3 - var(--i));
+}
+
+@media (min-width: 1024px) {
+  .wrb {
+    min-height: 170px;
+    margin: 26px 0 8px;
+    border-radius: 24px;
+    cursor: pointer;
+  }
+
+  .wrb-body {
+    padding: 26px 0 26px 30px;
+  }
+
+  .wrb-title {
+    font-size: 30px;
+  }
+
+  .wrb-sub {
+    font-size: 16px;
+  }
+
+  .wrb-posters {
+    width: 230px;
+  }
+
+  .wrb-poster {
+    right: calc(28px + var(--i) * 48px);
+    width: 84px;
+    height: 126px;
+    margin-top: -63px;
+  }
+
+  .wrb:hover {
+    filter: brightness(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrb {
+    transition: none;
+  }
+}

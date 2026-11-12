@@ -4,6 +4,7 @@ import { Chips } from '../components/Chips';
 import { EmptyState } from '../components/DramaGrid';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
+import { ReviewLine } from '../components/ReviewField';
 import { db, updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
 import { syncNow } from '../lib/sync';
@@ -217,6 +218,7 @@ function LibraryRow({ item }: { item: SavedDrama }) {
         <Poster path={item.posterPath} alt={item.title} size="w185" className="row-poster" />
         <div className="row-body">
           <div className="row-title">{item.title}</div>
+          <ReviewLine text={item.review} />
           <div className="row-sub">{[year, country, extra].filter(Boolean).join(' · ')}</div>
           <div className="row-meta">
             <span className="status">{st.title}</span>

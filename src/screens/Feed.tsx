@@ -5,7 +5,7 @@ import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { fetchUpcoming, formatAirDate, timeAgo, useNews, type NewsItem, type UpcomingEpisode } from '../lib/news';
-import { openDrama } from '../lib/router';
+import { navigate, openDrama } from '../lib/router';
 
 const TAGS = ['Все', 'Дорамы', 'Корея', 'Азия', 'K-drama', 'Фильмы'];
 
@@ -69,7 +69,15 @@ export function Feed({ active }: { active: boolean }) {
       <Refreshable onRefresh={onRefresh}>
         {upcoming.length > 0 && tag === 'Все' && (
           <section className="pblock feed-upcoming">
-            <h2 className="home-h2">Скоро новые серии</h2>
+            <div className="home-head">
+              <h2 className="home-h2">Скоро новые серии</h2>
+              <button type="button" className="strip-all" onClick={() => navigate('/calendar')}>
+                Календарь
+                <svg viewBox="0 0 8 14" fill="none" aria-hidden="true">
+                  <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
             <div className="strip">
               {upcoming.map((u) => (
                 <button key={u.item.key} className="strip-item strip-wide" onClick={() => openDrama('tv', u.item.tmdbId)}>

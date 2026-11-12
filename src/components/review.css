@@ -1,0 +1,41 @@
+/* «Мой отзыв» в карточке и строка отзыва в библиотеке. */
+
+.ios-row-stack.review-row {
+  gap: 6px;
+}
+
+.ios-textarea.review-textarea {
+  min-height: 72px;
+  resize: none;
+}
+
+.review-count {
+  align-self: flex-end;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.review-count[data-near='true'] {
+  color: #ff9f0a;
+}
+
+.row-review {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+@media (min-width: 1024px) {
+  .ios-textarea.review-textarea {
+    min-height: 88px;
+  }
+
+  .row-review {
+    font-size: 14px;
+  }
+}

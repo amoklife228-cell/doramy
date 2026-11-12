@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { openDrama } from '../lib/router';
+import { localizePeople, needsReadableName, readableName } from '../lib/people';
+import { openDrama, openPerson } from '../lib/router';
 import { credits, profileUrl, remember, similarTo, type CastMember } from '../lib/tmdb';
 import { itemKey, yearOf, type Drama, type MediaType } from '../lib/types';
 import { Poster } from './Poster';
+import './DetailExtras.css';
 
 /* Дополнительные блоки карточки: «В ролях», «Похожие» и кнопка «Поделиться». */
 
@@ -43,6 +45,16 @@ function useLoaded<T>(
 
 export function CastStrip({ mediaType, id, enabled }: { mediaType: MediaType; id: number; enabled: boolean }) {
   const cast = useLoaded(castCache, itemKey(mediaType, id), enabled, (s) => credits(mediaType, id, s));
+  // Имена хангылем или иероглифами заменяем на латиницу (или русское), найденную отдельным запросом.
+  const [names, setNames] = useState<Map<number, string>>(() => new Map());
+  useEffect(() => {
+    if (!cast || !cast.some((c) => needsReadableName(c.name))) return;
+    const controller = new AbortController();
+    localizePeople(cast, controller.signal, 15)
+      .then((list) => setNames(new Map(list.map((c) => [c.id, c.name]))))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [cast]);
   if (cast === null || (cast && cast.length === 0)) return null;
   return (
     <section className="block">
@@ -57,18 +69,25 @@ export function CastStrip({ mediaType, id, enabled }: { mediaType: MediaType; id
             ))
           : cast.map((c) => {
               const src = profileUrl(c.profilePath);
+              const name = names.get(c.id) ?? readableName(c.id, c.name);
               return (
-                <div key={c.id} className="cast-item">
+                <button
+                  key={c.id}
+                  type="button"
+                  className="cast-item"
+                  onClick={() => openPerson(c.id)}
+                  aria-label={c.character ? `${name}, ${c.character}` : name}
+                >
                   {src ? (
                     <img className="cast-photo" src={src} alt="" loading="lazy" decoding="async" draggable={false} />
                   ) : (
-                    <div className="cast-photo cast-photo-empty" aria-hidden="true">
-                      {initials(c.name)}
-                    </div>
+                    <span className="cast-photo cast-photo-empty" aria-hidden="true">
+                      {initials(name)}
+                    </span>
                   )}
-                  <div className="cast-name">{c.name}</div>
-                  {c.character && <div className="cast-role">{c.character}</div>}
-                </div>
+                  <span className="cast-name">{name}</span>
+                  {c.character && <span className="cast-role">{c.character}</span>}
+                </button>
               );
             })}
       </div>
@@ -134,21 +153,31 @@ const APP_URL = 'https://amoklife228-cell.github.io/doramy/';
 
 /** Кнопка «Поделиться» в шапке: системное меню iOS, а без него — копирование ссылки. */
 export function ShareButton({ drama }: { drama: Drama | null }) {
+  if (!drama) return null;
+  const year = yearOf(drama.firstAirDate);
+  return (
+    <ShareLink
+      title={drama.title}
+      text={`${drama.title}${year ? ` (${year})` : ''}${drama.voteAverage > 0 ? `, ★ ${drama.voteAverage.toFixed(1)}` : ''}. Смотри в «Дорамах»:`}
+      path={`/${drama.mediaType}/${drama.id}`}
+    />
+  );
+}
+
+/** Та же кнопка для любой страницы приложения: `path` — адрес после «#», например `/person/123`. */
+export function ShareLink({ title, text, path }: { title: string; text: string; path: string }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
     const t = setTimeout(() => setCopied(false), 2000);
     return () => clearTimeout(t);
   }, [copied]);
-  if (!drama) return null;
 
   const onShare = async () => {
-    const url = `${APP_URL}#/${drama.mediaType}/${drama.id}`;
-    const year = yearOf(drama.firstAirDate);
-    const text = `${drama.title}${year ? ` (${year})` : ''}${drama.voteAverage > 0 ? `, ★ ${drama.voteAverage.toFixed(1)}` : ''}. Смотри в «Дорамах»:`;
+    const url = `${APP_URL}#${path}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: drama.title, text, url });
+        await navigator.share({ title, text, url });
         return;
       }
       await navigator.clipboard.writeText(`${text} ${url}`);

@@ -9,7 +9,11 @@ import { installStripArrows } from './lib/stripArrows';
 import './styles.css';
 // Раскладка для компьютера: только внутри медиазапросов, телефонный вид не меняет.
 import './desktop.css';
+// Нижняя полоса в приложении с экрана «Домой» на iPhone.
+import './viewportFix.css';
+import { installViewportFix } from './lib/viewportFix';
 
+installViewportFix();
 applyAppearance(loadAppearance());
 installEdgeSwipe();
 installStripArrows();

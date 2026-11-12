@@ -12,6 +12,7 @@ import { SectionIcon } from '../components/SectionIcon';
 import { useDesktop } from '../lib/media';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
+import { PeopleRow, SearchBox } from '../components/SearchBox';
 import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
 import { GENRE_CARDS, GENRES, useGenreArt, type GenreSlug } from '../lib/genres';
@@ -60,6 +61,8 @@ export function Catalog() {
   const [mediaType, setMediaType] = useState<MediaType>('tv');
   const [filters, setFilters] = useState<Record<MediaType, CatalogFilters>>({ tv: DEFAULT_FILTERS, movie: DEFAULT_FILTERS });
   const [text, setText] = useState('');
+  // Сколько актёров нашлось по запросу (ряд «Актёры» над результатами).
+  const [peopleFound, setPeopleFound] = useState(0);
   const [randomBusy, setRandomBusy] = useState(false);
   const [randomError, setRandomError] = useState<string | null>(null);
   const [homeRefresh, setHomeRefresh] = useState(0);
@@ -172,23 +175,13 @@ export function Catalog() {
         </div>
 
         <div className="search-row">
-          <div className="searchbox searchbox-icon">
-            <SearchIcon />
-            <input
-              type="search"
-              placeholder={mediaType === 'tv' ? 'Найти сериал по названию' : 'Найти фильм по названию'}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              autoCorrect="off"
-              autoCapitalize="off"
-              enterKeyHint="search"
-            />
-            {text && (
-              <button className="searchbox-clear" onClick={() => setText('')} aria-label="Очистить">
-                ✕
-              </button>
-            )}
-          </div>
+          <SearchBox
+            value={text}
+            onChange={setText}
+            placeholder={mediaType === 'tv' ? 'Найти сериал по названию' : 'Найти фильм по названию'}
+            country={f.country}
+            enabled={configured}
+          />
           <button className="filter-btn" data-active={activeCount > 0} onClick={() => setFilterOpen(true)} aria-label="Фильтр">
             <SlidersIcon />
             {activeCount > 0 && <span className="filter-badge">{activeCount}</span>}
@@ -229,6 +222,7 @@ export function Catalog() {
                 </select>
               </div>
             )}
+            {searching && <PeopleRow query={query} country={f.country} enabled={configured} onCount={setPeopleFound} />}
             {list.error && list.items.length === 0 ? (
               <EmptyState
                 title="Не удалось загрузить"
@@ -239,6 +233,12 @@ export function Catalog() {
                   </button>
                 }
               />
+            ) : !list.loading && shown.length === 0 && (!list.hasMore || list.pagesLoaded >= 5) && searching && peopleFound > 0 ? (
+              // Названий нет, но нашлись актёры: они выше, крупная заглушка «Ничего не нашлось» тут ни к чему.
+              <p className="muted small people-only">
+                {mediaType === 'tv' ? 'Сериалов' : 'Фильмов'} с таким названием нет
+                {f.country === WORLD ? '.' : '. Попробуйте «Весь мир».'}
+              </p>
             ) : !list.loading && shown.length === 0 && (!list.hasMore || list.pagesLoaded >= 5) ? (
               <EmptyState
                 title="Ничего не нашлось"
@@ -687,15 +687,6 @@ function DiceIcon() {
       <circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none" />
       <circle cx="9" cy="15" r="1.3" fill="currentColor" stroke="none" />
       <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg className="search-icon" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="M16 16l4.5 4.5" />
     </svg>
   );
 }

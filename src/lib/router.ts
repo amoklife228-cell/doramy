@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DiscoverSort, LibraryKind, MediaType } from './types';
 
 export type Tab = 'catalog' | 'library' | 'feed' | 'profile';
-export type Overlay = 'settings' | 'notes' | 'history';
+export type Overlay = 'settings' | 'notes' | 'history' | 'calendar' | 'wrapped';
 
 export interface Route {
   tab: Tab;
@@ -16,13 +16,16 @@ export interface Route {
   collection: { mediaType: MediaType; id: string } | null;
   /** `#/genre/<dorama|series|movie>/<slug>[/<sort>]` — каталог жанра по картинке с главной. */
   genre: { kind: LibraryKind; slug: string; sort: DiscoverSort } | null;
+  /** `#/person/<id>` — страница актёра. */
+  person: { id: number } | null;
 }
 
 const SORT_IDS: DiscoverSort[] = ['popular', 'topRated', 'newest'];
 
 const TABS: Tab[] = ['catalog', 'library', 'feed', 'profile'];
 const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
-const OVERLAYS: Overlay[] = ['settings', 'notes', 'history'];
+// 'wrapped' — «Итоги года»; `#/wrapped/<год>` выбирает год (экран читает его из адреса сам).
+const OVERLAYS: Overlay[] = ['settings', 'notes', 'history', 'calendar', 'wrapped'];
 
 let lastTab: Tab = 'catalog';
 
@@ -36,7 +39,11 @@ export function parseHash(hash: string): Route {
     overlay: null,
     collection: null,
     genre: null,
+    person: null,
   };
+
+  const person = path.match(/^\/person\/(\d+)/);
+  if (person) return { ...base, person: { id: Number(person[1]) } };
 
   const detail = path.match(/^\/(tv|movie|drama)\/(\d+)/);
   if (detail) {
@@ -64,7 +71,7 @@ export function parseHash(hash: string): Route {
   lastTab = tab;
   const libraryKind = tab === 'library' && KINDS.includes(sub as LibraryKind) ? (sub as LibraryKind) : null;
   const libraryFavorites = tab === 'library' && sub === 'favorites';
-  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null, collection: null, genre: null };
+  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null, collection: null, genre: null, person: null };
 }
 
 export function openCollection(mediaType: MediaType, id: string) {
@@ -100,6 +107,10 @@ export function navigate(path: string) {
 
 export function openDrama(mediaType: MediaType, id: number) {
   navigate(`/${mediaType}/${id}`);
+}
+
+export function openPerson(id: number) {
+  navigate(`/person/${id}`);
 }
 
 export function openSettings() {

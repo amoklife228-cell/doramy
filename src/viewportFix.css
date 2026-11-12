@@ -1,0 +1,17 @@
+/* Исправление нижней полосы iOS (см. src/lib/viewportFix.ts): пока html[data-ios-gap] есть,
+   полноэкранные слои и всё, что прижато к низу, опускаются на --ios-gap до настоящего края экрана. */
+html[data-ios-gap] :is(.screen, .detail, .bs-root, .fs-backdrop, .sheet-backdrop, .filter, .pv-root, .ios-gap-fill) {
+  bottom: calc(0px - var(--ios-gap));
+}
+
+html[data-ios-gap] .tabbar {
+  bottom: calc(var(--tabbar-bottom) - var(--ios-gap));
+}
+
+html[data-ios-gap] .toast {
+  bottom: calc(var(--tabbar-h) + var(--tabbar-bottom) + 12px - var(--ios-gap));
+}
+
+html[data-ios-gap] .detail .toast {
+  bottom: calc(var(--safe-bottom) + 16px - var(--ios-gap));
+}

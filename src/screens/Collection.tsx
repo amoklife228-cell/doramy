@@ -17,7 +17,8 @@ export function Collection({ mediaType, id }: { mediaType: MediaType; id: string
   const collection = isCollectionId(id) ? COLLECTIONS[id] : null;
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && goBack();
+    // Поверх открыта карточка — Escape закрывает её, а не этот список.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && document.querySelectorAll('.detail').length <= 1 && goBack();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
