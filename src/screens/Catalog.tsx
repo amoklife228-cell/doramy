@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { tmdbImg } from '../lib/img';
+import { NOTHING, useLibraryItems } from '../lib/libraryStore';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
 import { CollectionStrip } from '../components/CollectionStrip';
 import { ContinueWatching } from '../components/ContinueWatching';
@@ -13,7 +14,6 @@ import { useDesktop } from '../lib/media';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { PeopleRow, SearchBox } from '../components/SearchBox';
-import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
 import { GENRE_CARDS, GENRES, useGenreArt, type GenreSlug } from '../lib/genres';
 import { openDrama, openGenre } from '../lib/router';
@@ -55,7 +55,7 @@ function openGenreFor(mediaType: MediaType, slug: GenreSlug, sort?: DiscoverSort
 
 export function Catalog() {
   const configured = useConfigured();
-  const library = useLiveQuery(() => db.items.toArray(), []) ?? [];
+  const library = useLibraryItems() ?? NOTHING;
   const libraryKeys = useMemo(() => new Set(library.map((s) => s.key)), [library]);
 
   const [mediaType, setMediaType] = useState<MediaType>('tv');
@@ -579,7 +579,11 @@ function CatalogHome({
         />
       ))}
 
-      <section className="moods" style={moodBg ? { backgroundImage: `url(${backdropUrl(moodBg)})` } : undefined}>
+      {/* Фон размыт заранее (маленький кадр + filter), а не backdrop-filter: тот на iPhone пересчитывается каждый кадр прокрутки. */}
+      <section
+        className="moods"
+        style={moodBg ? ({ '--moods-bg': `url(${tmdbImg('w300', moodBg)})` } as React.CSSProperties) : undefined}
+      >
         <div className="moods-inner">
           <h2 className="moods-title">Под настроение</h2>
           {MOODS.map((m, i) => (

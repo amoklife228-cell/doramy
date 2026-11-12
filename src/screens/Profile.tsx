@@ -1,12 +1,11 @@
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { NOTHING, useActivityDays, useLibraryItems } from '../lib/libraryStore';
 import type { Session } from '@supabase/supabase-js';
 import { BottomSheet } from '../components/BottomSheet';
 import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { WrappedBanner } from '../components/WrappedBanner';
-import { db } from '../lib/db';
 import { useDesktop } from '../lib/media';
 import { navigate, openDrama, openSettings } from '../lib/router';
 import { syncNow } from '../lib/sync';
@@ -15,8 +14,8 @@ import { kindOf, LIBRARY_KINDS, type LibraryKind, type SavedDrama } from '../lib
 import './Profile.css';
 
 export function Profile({ session }: { session: Session | null | undefined }) {
-  const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
-  const activity = useLiveQuery(() => db.activity.toArray(), []) ?? [];
+  const items = useLibraryItems() ?? NOTHING;
+  const activity = useActivityDays() ?? NOTHING;
   const [menuOpen, setMenuOpen] = useState(false);
   // id держим и после закрытия, чтобы шторка не опустела во время анимации ухода.
   const [achId, setAchId] = useState<string | null>(null);

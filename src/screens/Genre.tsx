@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
 import { Ambient } from '../components/Ambient';
 import { NavBar } from '../components/NavBar';
@@ -147,7 +148,7 @@ function HeroImage({ path }: { path: string }) {
   return (
     <img
       className="genre-hero-img"
-      src={`https://image.tmdb.org/t/p/w1280${path}`}
+      src={tmdbImg('w1280', path)}
       alt=""
       decoding="async"
       draggable={false}

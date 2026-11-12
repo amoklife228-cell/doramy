@@ -1,8 +1,7 @@
 import { useEffect, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { IosRow, IosSection } from '../components/IosList';
 import { NavBar } from '../components/NavBar';
-import { db } from '../lib/db';
+import { useActivityDays } from '../lib/libraryStore';
 import { goBack } from '../lib/router';
 import { formatRuntime } from '../lib/types';
 import { plural } from './Profile';
@@ -10,7 +9,7 @@ import { plural } from './Profile';
 /** История просмотров по дням: сколько серий и времени, свежие сверху, сгруппировано по месяцам. */
 export function History() {
   // undefined, пока база не ответила: так не мелькает «История пуста».
-  const activity = useLiveQuery(() => db.activity.toArray(), []);
+  const activity = useActivityDays();
   const days = useMemo(
     () => (activity ?? []).filter((d) => d.units > 0).sort((a, b) => (a.day < b.day ? 1 : -1)),
     [activity],

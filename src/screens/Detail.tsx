@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Ambient } from '../components/Ambient';
 import { CastStrip, ShareButton, SimilarStrip } from '../components/DetailExtras';
@@ -13,6 +14,7 @@ import { IosRow, IosSection, IosSwitch } from '../components/IosList';
 import { NavBar } from '../components/NavBar';
 import { addToLibrary, db, refreshMetadata, removeEntry, updateEntry } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
+import { useLibraryItems } from '../lib/libraryStore';
 import { useDesktop } from '../lib/media';
 import { goBack } from '../lib/router';
 import { countPatch, episodeOrder, stepWatched, type ShowOutline } from '../lib/episodes';
@@ -71,8 +73,8 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const libraryKeyList = useLiveQuery(() => db.items.toCollection().primaryKeys(), []);
-  const libraryKeys = useMemo(() => new Set((libraryKeyList ?? []) as string[]), [libraryKeyList]);
+  const library = useLibraryItems();
+  const libraryKeys = useMemo(() => new Set((library ?? []).map((s) => s.key)), [library]);
 
   const isMovie = mediaType === 'movie';
   const country = drama ? countryOf(drama.originCountries) : undefined;
@@ -233,7 +235,7 @@ function DeskHero({
   const year = yearOf(drama.firstAirDate);
   const isMovie = drama.mediaType === 'movie';
   const runtime = isMovie ? formatRuntime(drama.runtime) : null;
-  const backdrop = drama.backdropPath ? `https://image.tmdb.org/t/p/w1280${drama.backdropPath}` : null;
+  const backdrop = drama.backdropPath ? tmdbImg('w1280', drama.backdropPath) : null;
   const status = entry ? STATUSES.find((s) => s.id === entry.status)?.title : null;
   const meta = [
     year,

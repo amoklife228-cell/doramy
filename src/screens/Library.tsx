@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { NOTHING, useLibraryItems } from '../lib/libraryStore';
 import { Chips } from '../components/Chips';
 import { EmptyState } from '../components/DramaGrid';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { ReviewLine } from '../components/ReviewField';
-import { db, updateEntry } from '../lib/db';
+import { updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
 import { syncNow } from '../lib/sync';
 import {
@@ -80,7 +80,7 @@ export function Library({
   kindFromRoute: LibraryKind | null;
   favoritesFromRoute: boolean;
 }) {
-  const all = useLiveQuery(() => db.items.toArray(), []) ?? [];
+  const all = useLibraryItems() ?? NOTHING;
   const [kind, setKind] = useState<LibraryKind>(loadKind);
 
   // Переход из профиля: #/library/<kind> открывает нужный раздел, #/library/favorites — избранное.
@@ -200,7 +200,33 @@ export function Library({
   );
 }
 
-function LibraryRow({ item }: { item: SavedDrama }) {
+/**
+ * База на каждое изменение отдаёт новые объекты всех записей, поэтому сравниваем по полям,
+ * которые видны в строке: при «+» серии у одного сериала перерисуется одна строка, а не все.
+ */
+function sameRow(a: { item: SavedDrama }, b: { item: SavedDrama }): boolean {
+  const x = a.item;
+  const y = b.item;
+  return (
+    x === y ||
+    (x.key === y.key &&
+      x.title === y.title &&
+      x.posterPath === y.posterPath &&
+      x.review === y.review &&
+      x.firstAirDate === y.firstAirDate &&
+      x.originCountries.join() === y.originCountries.join() &&
+      x.episodeCount === y.episodeCount &&
+      x.runtime === y.runtime &&
+      x.status === y.status &&
+      x.userRating === y.userRating &&
+      x.episodesWatched === y.episodesWatched &&
+      x.isFavorite === y.isFavorite)
+  );
+}
+
+const LibraryRow = memo(LibraryRowView, sameRow);
+
+function LibraryRowView({ item }: { item: SavedDrama }) {
   const country = countryLabel(item.originCountries);
   const year = yearOf(item.firstAirDate);
   const st = STATUS_BY_ID.get(item.status)!;

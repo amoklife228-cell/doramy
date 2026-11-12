@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 import { addToLibrary } from '../lib/db';
 import { openDrama } from '../lib/router';
 import { countryLabel, itemKey, yearOf, type Drama, type MediaType } from '../lib/types';
@@ -105,7 +106,7 @@ export function FeaturedHero({
         <img
           key={itemKey(d.mediaType, d.id)}
           className="feature-img"
-          src={`https://image.tmdb.org/t/p/w1280${d.backdropPath}`}
+          src={tmdbImg('w1280', d.backdropPath ?? '')}
           alt=""
           decoding="async"
           draggable={false}

@@ -30,7 +30,10 @@ export function usePullToRefresh(ref: RefObject<HTMLElement>, onRefresh: () => P
       if (!active || startY.current === null) return;
       const dy = e.touches[0].clientY - startY.current;
       if (dy <= 0 || el.scrollTop > 0) {
-        setPull(0);
+        if (pullRef.current !== 0) setPull(0);
+        // Палец пошёл вверх или список уже прокручен — это обычная прокрутка,
+        // до следующего касания жест не наш и движения не обрабатываем.
+        if (dy < 0 || el.scrollTop > 0) active = false;
         return;
       }
       // Сопротивление: чем дальше тянем, тем медленнее растёт.

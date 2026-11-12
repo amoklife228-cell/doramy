@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 import { createPortal } from 'react-dom';
 import './PosterViewer.css';
 
-const IMG = 'https://image.tmdb.org/t/p/';
 const ZOOM = 2.5;
 /** Насколько смахнуть вниз, чтобы закрыть. */
 const CLOSE_DRAG = 110;
@@ -128,14 +128,14 @@ export function PosterViewer({ path, title, onClose }: { path: string; title: st
             <img
               ref={img}
               className="pv-img"
-              src={`${IMG}w500${path}`}
+              src={tmdbImg('w500', path)}
               alt={title}
               draggable={false}
               onClick={onImageClick}
             />
             <img
               className="pv-img pv-hires"
-              src={`${IMG}original${path}`}
+              src={tmdbImg('original', path)}
               alt=""
               aria-hidden="true"
               draggable={false}

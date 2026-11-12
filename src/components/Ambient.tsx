@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 
 /** Через сколько пикселей прокрутки свечение полностью гаснет. */
 const FADE_DISTANCE = 700;
@@ -48,7 +49,7 @@ export function Ambient({ path, tint }: { path: string | null | undefined; tint?
       style={tint ? ({ '--ambient-tint': tint } as React.CSSProperties) : undefined}
     >
       {layers.map((p) => (
-        <img key={p} className="ambient-img" src={`https://image.tmdb.org/t/p/w300${p}`} alt="" decoding="async" draggable={false} />
+        <img key={p} className="ambient-img" src={tmdbImg('w300', p)} alt="" decoding="async" draggable={false} />
       ))}
     </div>
   );

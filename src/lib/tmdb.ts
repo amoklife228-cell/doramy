@@ -11,6 +11,7 @@ import {
   type Drama,
   type MediaType,
 } from './types';
+import { tmdbImg } from './img';
 
 const BASE = 'https://api.themoviedb.org/3';
 const KEY_STORAGE = 'doramy.tmdb.apiKey';
@@ -686,7 +687,7 @@ export async function credits(mediaType: MediaType, id: number, signal?: AbortSi
 }
 
 export function profileUrl(path: string | null): string | null {
-  return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+  return path ? tmdbImg('w185', path) : null;
 }
 
 /** Похожие: рекомендации TMDB, а если их нет — «similar» (по жанрам и ключевым словам). */
@@ -716,11 +717,11 @@ export async function randomPick(mediaType: MediaType, country: string, signal?:
 }
 
 export function backdropUrl(path: string | null | undefined): string | null {
-  return path ? `https://image.tmdb.org/t/p/w780${path}` : null;
+  return path ? tmdbImg('w780', path) : null;
 }
 
 export function posterUrl(path: string | null | undefined, size: 'w185' | 'w342' | 'w500' = 'w342'): string | null {
-  return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+  return path ? tmdbImg(size, path) : null;
 }
 
 /** Кэш карточек, чтобы экран деталей открывался мгновенно и работал без сети. */

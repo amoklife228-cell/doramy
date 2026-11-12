@@ -1,15 +1,23 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, memo, Suspense, useState } from 'react';
 import { historyIndex } from './lib/historyIndex';
+import { ScreenActiveContext } from './lib/libraryStore';
 import { advance, initialNav, layers } from './lib/overlayStack';
 import { useRoute, type Tab } from './lib/router';
 import { useSession } from './lib/supabase';
 import { useSyncLifecycle } from './lib/sync';
 import { itemKey } from './lib/types';
 import { TabBar } from './components/TabBar';
-import { Catalog } from './screens/Catalog';
-import { Library } from './screens/Library';
-import { Feed } from './screens/Feed';
-import { Profile } from './screens/Profile';
+import { Catalog as CatalogScreen } from './screens/Catalog';
+import { Library as LibraryScreen } from './screens/Library';
+import { Feed as FeedScreen } from './screens/Feed';
+import { Profile as ProfileScreen } from './screens/Profile';
+
+// Каждый переход (открыть карточку, «Назад») перерисовывает App. Вкладки от этого не зависят
+// и с memo не пересчитываются заново — на телефоне это была заметная часть задержки.
+const Catalog = memo(CatalogScreen);
+const Library = memo(LibraryScreen);
+const Feed = memo(FeedScreen);
+const Profile = memo(ProfileScreen);
 
 // Оверлеи открываются не сразу, поэтому грузятся отдельными чанками (вкладки остаются в основном).
 const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
@@ -46,7 +54,7 @@ export default function App() {
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>
-      {node}
+      <ScreenActiveContext.Provider value={route.tab === tab}>{node}</ScreenActiveContext.Provider>
     </section>
   );
 

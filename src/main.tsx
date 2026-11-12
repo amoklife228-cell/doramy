@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { applyAppearance, loadAppearance } from './lib/appearance';
 import { fixLibraryTitles } from './lib/db';
+import { imageMode, installImageProbe, subscribeImageMode } from './lib/img';
 import { installEdgeSwipe } from './lib/edgeSwipe';
 import { installStripArrows } from './lib/stripArrows';
 import './styles.css';
@@ -36,8 +37,19 @@ setTimeout(() => {
   if (navigator.onLine) void fixLibraryTitles().catch(() => undefined);
 }, 2500);
 
+installImageProbe();
+
+/**
+ * Если сервер картинок TMDB оказался недоступен, адреса меняются на прокси (lib/img.ts).
+ * Адреса считаются при отрисовке, поэтому перемонтируем приложение: маршрут в адресе, он сохранится.
+ */
+function Root() {
+  const mode = React.useSyncExternalStore(subscribeImageMode, imageMode);
+  return <App key={mode} />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <Root />
   </React.StrictMode>,
 );

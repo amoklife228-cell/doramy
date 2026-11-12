@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { NOTHING, useLibraryItems } from '../lib/libraryStore';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
-import { db } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
 import { fetchUpcoming, formatAirDate, timeAgo, useNews, type NewsItem, type UpcomingEpisode } from '../lib/news';
 import { navigate, openDrama } from '../lib/router';
@@ -11,7 +10,7 @@ const TAGS = ['Все', 'Дорамы', 'Корея', 'Азия', 'K-drama', 'Ф
 
 export function Feed({ active }: { active: boolean }) {
   const configured = useConfigured();
-  const library = useLiveQuery(() => db.items.toArray(), []) ?? [];
+  const library = useLibraryItems() ?? NOTHING;
   const { feed, error, loading, checkedAt, refresh } = useNews(active);
   const [tag, setTag] = useState('Все');
 

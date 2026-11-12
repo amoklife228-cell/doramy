@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { tmdbImg } from '../lib/img';
 import { Ambient } from '../components/Ambient';
 import { ShareLink } from '../components/DetailExtras';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
@@ -7,7 +7,7 @@ import { NavBar } from '../components/NavBar';
 import { Poster } from '../components/Poster';
 import { PosterViewer } from '../components/PosterViewer';
 import { Refreshable } from '../components/Refreshable';
-import { db } from '../lib/db';
+import { useLibraryItems } from '../lib/libraryStore';
 import { useConfigured } from '../lib/hooks';
 import { useDesktop } from '../lib/media';
 import { cachedPerson, fetchPerson, localizeCredits, type Person as PersonData, type PersonCredit } from '../lib/people';
@@ -76,7 +76,7 @@ export function Person({ id }: { id: number }) {
     return () => scroller.removeEventListener('scroll', onScroll);
   }, [desktop]);
 
-  const library = useLiveQuery(() => db.items.toArray(), []);
+  const library = useLibraryItems();
   const marks = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of library ?? []) m.set(s.key, STATUS_BY_ID.get(s.status)?.title ?? 'В библиотеке');
@@ -162,7 +162,7 @@ function PersonBody({
   const movieCount = roles.length - tvCount;
   const rated = known.filter((c) => c.drama.voteAverage > 0 && c.drama.voteCount >= 20);
   const avg = rated.length ? rated.reduce((a, c) => a + c.drama.voteAverage, 0) / rated.length : 0;
-  const photo = person.profilePath ? `https://image.tmdb.org/t/p/h632${person.profilePath}` : null;
+  const photo = person.profilePath ? tmdbImg('h632', person.profilePath) : null;
   const life = lifeLine(person);
   const place = person.placeOfBirth ? translatePlace(person.placeOfBirth) : null;
   const photos = person.photos.filter((p) => p !== person.profilePath).slice(0, 12);
@@ -241,7 +241,7 @@ function PersonBody({
           <div className="strip person-photos">
             {photos.map((p) => (
               <button key={p} type="button" className="person-photos-item" onClick={() => setViewer(p)} aria-label="Открыть фото">
-                <img src={`https://image.tmdb.org/t/p/w185${p}`} alt="" loading="lazy" decoding="async" draggable={false} />
+                <img src={tmdbImg('w185', p)} alt="" loading="lazy" decoding="async" draggable={false} />
               </button>
             ))}
           </div>

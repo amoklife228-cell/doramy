@@ -170,7 +170,7 @@
 .wr-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(40px);
+  /* Мягкий круг градиентом, без filter: blur — размытие под анимацией на iPhone пересчитывалось каждый кадр. */
   opacity: 0.75;
   animation: wr-float 9s ease-in-out infinite alternate;
 }
@@ -180,7 +180,7 @@
   right: -22cqw;
   width: 78cqw;
   height: 78cqw;
-  background: var(--b1);
+  background: radial-gradient(closest-side, var(--b1), transparent);
   opacity: 0.55;
 }
 
@@ -189,7 +189,7 @@
   left: -30cqw;
   width: 90cqw;
   height: 90cqw;
-  background: var(--b2);
+  background: radial-gradient(closest-side, var(--b2), transparent);
   opacity: 0.5;
   animation-duration: 11s;
   animation-direction: alternate-reverse;
@@ -200,7 +200,7 @@
   right: -26cqw;
   width: 54cqw;
   height: 54cqw;
-  background: var(--b3);
+  background: radial-gradient(closest-side, var(--b3), transparent);
   opacity: 0.35;
   animation-duration: 13s;
 }

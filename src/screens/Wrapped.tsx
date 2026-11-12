@@ -9,8 +9,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../lib/db';
+import { tmdbImg } from '../lib/img';
+import { useActivityDays, useLibraryItems } from '../lib/libraryStore';
 import { useMediaQuery } from '../lib/media';
 import { navigate } from '../lib/router';
 import { posterUrl } from '../lib/tmdb';
@@ -93,8 +93,8 @@ interface Card {
 
 export function Wrapped() {
   const year = useHashYear();
-  const items = useLiveQuery(() => db.items.toArray(), []);
-  const activity = useLiveQuery(() => db.activity.toArray(), []);
+  const items = useLibraryItems();
+  const activity = useActivityDays();
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)');
   const data = useMemo(
     () => (items && activity ? computeWrapped(items, activity, year) : null),
@@ -707,7 +707,7 @@ function ActorCard({ actor }: { actor: FavouriteActor | null }) {
       </div>
     );
   }
-  const photo = actor.profilePath ? `https://image.tmdb.org/t/p/w342${actor.profilePath}` : null;
+  const photo = actor.profilePath ? tmdbImg('w342', actor.profilePath) : null;
   const n = actor.titles.length;
   return (
     <div className="wr-body wr-body-center">

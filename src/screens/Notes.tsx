@@ -1,15 +1,14 @@
 import { useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { NavBar } from '../components/NavBar';
 import { Poster } from '../components/Poster';
-import { db } from '../lib/db';
+import { useLibraryItems } from '../lib/libraryStore';
 import { goBack, openDrama } from '../lib/router';
 import { STATUS_BY_ID } from '../lib/types';
 
 /** Все записи с заметками, свежие сверху. */
 export function Notes() {
   // undefined, пока база не ответила: так не мелькает «Заметок пока нет».
-  const items = useLiveQuery(() => db.items.toArray(), []);
+  const items = useLibraryItems();
   const withNotes = (items ?? []).filter((s) => s.notes.trim().length > 0).sort((a, b) => b.updatedAt - a.updatedAt);
 
   useEffect(() => {

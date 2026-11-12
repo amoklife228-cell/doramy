@@ -463,6 +463,9 @@ input[type='search']::-webkit-search-cancel-button {
   align-items: center;
   gap: 4px;
   border-bottom: 1px solid var(--bg-elev);
+  /* Строки за пределами экрана не раскладываются и не рисуются, пока до них не докрутили. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 123px;
 }
 
 .row-main {
@@ -1189,10 +1192,11 @@ input.ios-switch:checked::after {
 }
 
 /* Заглушки загрузки */
+/* Пульсация прозрачностью: её считает видеокарта. Прежний перелив (background-position)
+   перерисовывал каждую заглушку каждый кадр — как раз когда грузится лента. */
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-elev) 0%, var(--bg-elev2) 50%, var(--bg-elev) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.3s ease-in-out infinite;
+  background: var(--bg-elev2);
+  animation: shimmer 1.1s ease-in-out infinite alternate;
 }
 
 .skeleton-line {
@@ -1203,10 +1207,10 @@ input.ios-switch:checked::after {
 
 @keyframes shimmer {
   from {
-    background-position: 100% 0;
+    opacity: 1;
   }
   to {
-    background-position: -100% 0;
+    opacity: 0.45;
   }
 }
 
@@ -2319,17 +2323,17 @@ code {
   margin-top: 24px;
   border-radius: 18px;
   overflow: hidden;
-  background: var(--bg-elev) center / cover no-repeat;
+  background: var(--bg-elev);
   min-height: 190px;
 }
 
+/* Размытый кадр: обычный filter считается один раз при отрисовке, в отличие от backdrop-filter. */
 .moods::before {
   content: '';
   position: absolute;
-  inset: 0;
-  backdrop-filter: blur(18px) brightness(0.55);
-  -webkit-backdrop-filter: blur(18px) brightness(0.55);
-  background: rgba(15, 15, 20, 0.35);
+  inset: -36px;
+  background: linear-gradient(rgba(15, 15, 20, 0.35), rgba(15, 15, 20, 0.35)), var(--moods-bg, none) center / cover no-repeat;
+  filter: blur(18px) brightness(0.55);
 }
 
 .moods-inner {
@@ -2348,8 +2352,6 @@ code {
   color: #fff;
   font-size: 17px;
   font-weight: 600;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 /* Pull-to-refresh */
@@ -2732,9 +2734,9 @@ code {
   display: flex;
   padding: 0 6px;
   border-radius: calc(var(--tabbar-h) / 2);
-  background: rgba(28, 28, 30, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* Без backdrop-filter: под панелью всё время едет содержимое, и на iPhone размытие
+     пересчитывалось каждый кадр прокрутки. При такой плотности фона разницы не видно. */
+  background: rgba(30, 30, 32, 0.97);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
   max-width: 560px;
   margin: 0 auto;

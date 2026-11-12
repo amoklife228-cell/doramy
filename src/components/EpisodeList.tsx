@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tmdbImg } from '../lib/img';
 import {
   changeWatched,
   episodeOrder,
@@ -326,7 +327,7 @@ function EpisodeRow({
       {desktop && (
         <span className="ep-still">
           {e.stillPath ? (
-            <img src={`https://image.tmdb.org/t/p/w300${e.stillPath}`} alt="" loading="lazy" decoding="async" draggable={false} />
+            <img src={tmdbImg('w300', e.stillPath)} alt="" loading="lazy" decoding="async" draggable={false} />
           ) : (
             <span className="ep-still-empty">{e.number}</span>
           )}

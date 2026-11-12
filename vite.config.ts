@@ -60,10 +60,21 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^https:\/\/image\.tmdb\.org\//,
+            // Проверка доступности (?probe=…, lib/img.ts) идёт мимо кэша, иначе он ответил бы за сеть.
+            urlPattern: ({ url }) => url.hostname === 'image.tmdb.org' && !url.searchParams.has('probe'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'tmdb-images',
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Те же картинки через прокси, когда image.tmdb.org недоступен.
+            urlPattern: /^https:\/\/wsrv\.nl\/\?url=image\.tmdb\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tmdb-images-proxy',
               expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },

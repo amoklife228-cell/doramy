@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { NavBar } from '../components/NavBar';
 import { Poster } from '../components/Poster';
-import { db } from '../lib/db';
+import { useLibraryItems } from '../lib/libraryStore';
 import { addDays, cachedCalendar, calendarRange, loadCalendar, trackedShows, type CalendarEpisode } from '../lib/calendar';
 import { useConfigured } from '../lib/hooks';
 import { useDesktop } from '../lib/media';
@@ -25,7 +24,7 @@ export function Calendar() {
   const configured = useConfigured();
   const desktop = useDesktop();
   // undefined, пока база не ответила: так не мелькает пустое состояние.
-  const library = useLiveQuery(() => db.items.toArray(), []);
+  const library = useLibraryItems();
   const tracked = useMemo(() => trackedShows(library ?? []), [library]);
   const basis = useMemo(() => tracked.map((s) => s.key).sort().join(','), [tracked]);
 
