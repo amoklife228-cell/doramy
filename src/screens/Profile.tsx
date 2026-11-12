@@ -6,6 +6,7 @@ import { IconColors, IosRow, IosSection } from '../components/IosList';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
+import { useDesktop } from '../lib/media';
 import { navigate, openDrama, openSettings } from '../lib/router';
 import { syncNow } from '../lib/sync';
 import { buildHeatmap, computeAchievements, computeStats, type Achievement, type ProfileStats } from '../lib/stats';
@@ -21,7 +22,9 @@ export function Profile({ session }: { session: Session | null | undefined }) {
   const [achOpen, setAchOpen] = useState(false);
 
   const stats = useMemo(() => computeStats(items, activity), [items, activity]);
-  const weeks = useMemo(() => buildHeatmap(activity, 26), [activity]);
+  // На компьютере места хватает на целый год, на телефоне — полгода.
+  const desktop = useDesktop();
+  const weeks = useMemo(() => buildHeatmap(activity, desktop ? 52 : 26), [activity, desktop]);
   const achievements = useMemo(() => computeAchievements(stats), [stats]);
   const selectedAch = achievements.find((a) => a.id === achId) ?? null;
 

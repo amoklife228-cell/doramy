@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { LibraryKind, MediaType } from './types';
+import type { DiscoverSort, LibraryKind, MediaType } from './types';
 
 export type Tab = 'catalog' | 'library' | 'feed' | 'profile';
 export type Overlay = 'settings' | 'notes' | 'history';
@@ -14,7 +14,11 @@ export interface Route {
   overlay: Overlay | null;
   /** `#/collection/<tv|movie>/<id>` — полный список подборки с главной каталога. */
   collection: { mediaType: MediaType; id: string } | null;
+  /** `#/genre/<dorama|series|movie>/<slug>[/<sort>]` — каталог жанра по картинке с главной. */
+  genre: { kind: LibraryKind; slug: string; sort: DiscoverSort } | null;
 }
+
+const SORT_IDS: DiscoverSort[] = ['popular', 'topRated', 'newest'];
 
 const TABS: Tab[] = ['catalog', 'library', 'feed', 'profile'];
 const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
@@ -31,6 +35,7 @@ export function parseHash(hash: string): Route {
     detail: null,
     overlay: null,
     collection: null,
+    genre: null,
   };
 
   const detail = path.match(/^\/(tv|movie|drama)\/(\d+)/);
@@ -45,6 +50,13 @@ export function parseHash(hash: string): Route {
     return { ...base, tab: 'catalog', collection: { mediaType: collection[1] as MediaType, id: collection[2] } };
   }
 
+  const genre = path.match(/^\/genre\/(dorama|series|movie)\/([a-z]+)(?:\/([a-zA-Z]+))?/);
+  if (genre) {
+    lastTab = 'catalog';
+    const sort = SORT_IDS.includes(genre[3] as DiscoverSort) ? (genre[3] as DiscoverSort) : 'popular';
+    return { ...base, tab: 'catalog', genre: { kind: genre[1] as LibraryKind, slug: genre[2], sort } };
+  }
+
   const [seg, sub] = path.replace(/^\//, '').split('/');
   if (OVERLAYS.includes(seg as Overlay)) return { ...base, overlay: seg as Overlay };
 
@@ -52,11 +64,24 @@ export function parseHash(hash: string): Route {
   lastTab = tab;
   const libraryKind = tab === 'library' && KINDS.includes(sub as LibraryKind) ? (sub as LibraryKind) : null;
   const libraryFavorites = tab === 'library' && sub === 'favorites';
-  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null, collection: null };
+  return { tab, libraryKind, libraryFavorites, detail: null, overlay: null, collection: null, genre: null };
 }
 
 export function openCollection(mediaType: MediaType, id: string) {
   navigate(`/collection/${mediaType}/${id}`);
+}
+
+function genrePath(kind: LibraryKind, slug: string, sort: DiscoverSort) {
+  return `/genre/${kind}/${slug}${sort === 'popular' ? '' : `/${sort}`}`;
+}
+
+export function openGenre(kind: LibraryKind, slug: string, sort: DiscoverSort = 'popular') {
+  navigate(genrePath(kind, slug, sort));
+}
+
+/** Смена раздела или сортировки на странице жанра: без новой записи в истории, «Назад» ведёт в каталог. */
+export function replaceGenre(kind: LibraryKind, slug: string, sort: DiscoverSort) {
+  location.replace(`#${genrePath(kind, slug, sort)}`);
 }
 
 export function useRoute(): Route {

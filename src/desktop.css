@@ -1,0 +1,1279 @@
+/*
+ * Раскладка для компьютера и планшета. Всё, что меняет вид, лежит внутри медиазапросов:
+ * на телефоне (узкий экран, касания) приложение выглядит и работает как раньше.
+ *
+ *  - (min-width: 1024px) — боковое меню вместо нижней «таблетки», содержимое по центру
+ *    с ограниченной шириной, карточка с широким кадром и двумя колонками, шторки — окна по центру;
+ *  - (min-width: 768px) and (max-width: 1023px) — телефонная раскладка, но не во всю ширину;
+ *  - (hover: hover) and (pointer: fine) — наведение мышью, тонкие полосы прокрутки, рамка фокуса.
+ */
+
+/* Название приложения в боковом меню: на телефоне его нет. */
+.tabbar-brand {
+  display: none;
+}
+
+/* ---------- Стрелки у горизонтальных лент (src/lib/stripArrows.ts) ---------- */
+
+.sa-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 35;
+}
+
+.sa-btn {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(28, 28, 30, 0.82);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.9);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s, background 0.15s;
+}
+
+.sa-btn[data-size='small'] {
+  width: 32px;
+  height: 32px;
+}
+
+.sa-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sa-btn[data-size='small'] svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sa-btn[data-show='true'] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s, background 0.15s;
+}
+
+.sa-btn:hover {
+  background: rgba(58, 58, 60, 0.95);
+}
+
+.sa-btn:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-btn,
+  .sa-btn[data-show='true'] {
+    transition: none;
+  }
+}
+
+/* ---------- Мышь: наведение, полосы прокрутки, фокус с клавиатуры ---------- */
+
+@media (hover: hover) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a3c transparent;
+  }
+
+  .content:hover,
+  .fs-body:hover,
+  .bs-sheet:hover {
+    scrollbar-color: #545458 transparent;
+  }
+
+  .card,
+  .strip-item,
+  .rec,
+  .genre-card,
+  .row-main,
+  .continue-main,
+  .news-link,
+  .ach,
+  .pblock-link {
+    cursor: pointer;
+  }
+
+  /* Постер чуть приподнимается и светлеет. */
+  .card-poster,
+  .strip-poster-wrap,
+  .strip-item > .strip-poster,
+  .rec-img,
+  .continue-poster {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  }
+
+  .card:hover .card-poster,
+  .strip-item:hover .strip-poster-wrap,
+  .strip-item:hover > .strip-poster,
+  .rec:hover .rec-img {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.65);
+    filter: brightness(1.08);
+  }
+
+  .card:hover .card-title,
+  .rec:hover .rec-title,
+  .strip-item:hover .strip-title {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+  }
+
+  .genre-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .genre-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .genre-card:hover .genre-img[data-loaded='true'] {
+    transform: scale(1.06);
+  }
+
+  .chip:hover:not([data-active='true']),
+  .segmented button:hover:not([data-active='true']) {
+    background: var(--bg-elev2);
+    color: var(--text);
+  }
+
+  .btn:hover:not(:disabled),
+  .mood:hover,
+  .continue-plus:hover:not(:disabled) {
+    filter: brightness(1.15);
+  }
+
+  .icon-btn:hover:not(:disabled),
+  .filter-btn:hover {
+    background: var(--bg-elev2);
+  }
+
+  button.ios-row:hover:not(:disabled),
+  .ios-row:has(.ios-select-overlay):hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .fs-sheet button.ios-row:hover:not(:disabled),
+  .profile-menu button.ios-row:hover:not(:disabled) {
+    background: #3a3a3c;
+  }
+
+  .news-link,
+  .row,
+  .continue-card {
+    transition: background 0.15s ease;
+  }
+
+  .news-link:hover,
+  .continue-card:hover {
+    background: var(--bg-elev2);
+  }
+
+  .back:hover,
+  .fs-action:hover:not(:disabled),
+  .strip-all:hover,
+  .nav-icon-btn:hover,
+  .link:hover {
+    opacity: 0.75;
+  }
+
+  .row-fav:hover {
+    color: var(--accent);
+  }
+
+  .stepper button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .trailer-poster:hover .trailer-play {
+    background: var(--accent);
+  }
+
+  .trailer-play {
+    transition: background 0.15s ease;
+  }
+
+  button.ach:hover .ach-art {
+    transform: translateY(-3px);
+  }
+
+  /* Рамка фокуса только для клавиатуры. Поля ввода подсвечиваются своей рамкой, как и раньше. */
+  :is(button, a[href], summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .tab:focus-visible,
+  .ios-row:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* Невидимый список поверх строки: подсвечиваем саму строку. */
+  .ios-row:has(.ios-select-overlay:focus-visible) {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .card:focus-visible,
+  .strip-item:focus-visible,
+  .rec:focus-visible {
+    outline: none;
+  }
+
+  .card:focus-visible .card-poster,
+  .strip-item:focus-visible :is(.strip-poster-wrap, .strip-poster),
+  .rec:focus-visible .rec-img {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- Планшет: телефонная раскладка по центру ---------- */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .screen .topbar,
+  .screen .content,
+  .detail .content {
+    padding-left: max(16px, calc((100% - 860px) / 2));
+    padding-right: max(16px, calc((100% - 860px) / 2));
+  }
+
+  .detail .nav-bar {
+    padding-left: max(8px, calc((100% - 860px) / 2 - 8px));
+    padding-right: max(8px, calc((100% - 860px) / 2 - 8px));
+  }
+
+  .rec {
+    width: 340px;
+  }
+}
+
+/* ---------- Компьютер ---------- */
+
+@media (min-width: 1024px) {
+  :root {
+    --side-w: 232px;
+    /* Ширина содержимого; узкие страницы (настройки, профиль) задают свою. */
+    --page-max: 1240px;
+    /* Нижней панели нет: снизу обычный отступ. */
+    --tabbar-space: 56px;
+  }
+
+  /* ---- Боковое меню вместо нижней панели; видно и под открытой карточкой ---- */
+
+  .tabbar,
+  .tabbar[data-hidden='true'] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    z-index: 25;
+    width: var(--side-w);
+    height: auto;
+    max-width: none;
+    margin: 0;
+    padding: 24px 14px;
+    border-radius: 0;
+    background: #0a0a0b;
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .tabbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 0 12px 26px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .tabbar-logo {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--accent);
+    box-shadow: 0 4px 14px rgba(229, 32, 46, 0.35);
+  }
+
+  .tabbar-logo svg {
+    width: 20px;
+    height: 20px;
+    fill: #fff;
+  }
+
+  .tab {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 14px;
+    height: 46px;
+    padding: 0 12px;
+    border-radius: 12px;
+    color: #aeaeb2;
+    font-size: 16px;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .tab .tab-icon,
+  .tab[data-active='true'] .tab-icon {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  .tab:hover:not([data-active='true']) {
+    background: var(--bg-elev);
+    color: var(--text);
+  }
+
+  .tab[data-active='true'] {
+    background: rgba(229, 32, 46, 0.15);
+    color: var(--accent);
+  }
+
+  /* ---- Экраны и оверлеи — справа от меню ---- */
+
+  .screen,
+  .detail {
+    left: var(--side-w);
+  }
+
+  .screen .topbar,
+  .screen .content,
+  .detail .content {
+    padding-left: max(32px, calc((100% - var(--page-max)) / 2));
+    padding-right: max(32px, calc((100% - var(--page-max)) / 2));
+  }
+
+  .screen .topbar {
+    padding-top: 26px;
+    padding-bottom: 16px;
+    gap: 16px;
+  }
+
+  .screen .content {
+    padding-top: 8px;
+  }
+
+  .detail .nav-bar {
+    min-height: 56px;
+    padding: 6px max(24px, calc((100% - var(--page-max)) / 2 - 8px)) 0;
+  }
+
+  .detail .content {
+    padding-bottom: 56px;
+  }
+
+  /* Узкие страницы: настройки, заметки, история. */
+  .detail:has(.ios-page):not(:has(.grid)) {
+    --page-max: 720px;
+  }
+
+  .screen:has(.profile) {
+    --page-max: 1040px;
+  }
+
+  /* Ползунки положения нижней панели на компьютере не нужны: панели нет. */
+  .ios-section:has(input[aria-label='Поднять панель снизу']) {
+    display: none;
+  }
+
+  .toast,
+  .detail .toast {
+    left: calc(var(--side-w) + (100vw - var(--side-w)) / 2);
+    right: auto;
+    bottom: 28px;
+    width: max-content;
+    max-width: 480px;
+    transform: translateX(-50%);
+  }
+
+  .pblock {
+    margin-top: 40px;
+  }
+
+  .ios-large-title {
+    font-size: 36px;
+    margin-bottom: 8px;
+  }
+
+  /* ---- Каталог: шапка в одну строку ---- */
+
+  .topbar:has(.cat-head) {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title seg search dice'
+      'chips chips chips chips';
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 18px;
+  }
+
+  .cat-head {
+    display: contents;
+  }
+
+  .cat-head .profile-bar-spacer {
+    display: none;
+  }
+
+  .cat-title {
+    grid-area: title;
+    text-align: left;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .cat-head .icon-btn {
+    grid-area: dice;
+  }
+
+  .topbar:has(.cat-head) .search-row {
+    grid-area: search;
+    justify-self: end;
+    width: 100%;
+    max-width: 460px;
+  }
+
+  .topbar:has(.cat-head) .segmented {
+    grid-area: seg;
+    width: 250px;
+    margin-left: 8px;
+  }
+
+  .topbar:has(.cat-head) .chips {
+    grid-area: chips;
+  }
+
+  .search-row .searchbox input {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  .segmented-wide button {
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
+  /* Главная каталога */
+  .genre-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    overflow: visible;
+  }
+
+  .genre-card {
+    width: auto;
+    height: 136px;
+    padding: 16px 18px;
+    font-size: 21px;
+  }
+
+  .rec-strip {
+    gap: 16px;
+  }
+
+  .rec {
+    width: calc((100% - 3 * 16px) / 4);
+  }
+
+  .rec-title {
+    font-size: 16px;
+  }
+
+  .moods {
+    margin-top: 40px;
+    min-height: 0;
+  }
+
+  .moods-inner {
+    padding: 40px 24px;
+  }
+
+  .continue-card {
+    width: 340px;
+  }
+
+  /* Ленты постеров: целое число карточек на ширину ленты. */
+  .strip {
+    container-type: inline-size;
+    gap: 16px;
+  }
+
+  .strip-item,
+  .strip-wide {
+    width: calc((100cqi - 6 * 16px) / 7);
+  }
+
+  .strip-poster,
+  .strip-poster-wrap,
+  .strip-wide .strip-poster {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+  }
+
+  .strip-poster-wrap .strip-poster {
+    height: 100%;
+  }
+
+  .strip-title {
+    font-size: 14px;
+  }
+
+  @container (min-width: 1300px) {
+    .strip-item,
+    .strip-wide {
+      width: calc((100cqi - 7 * 16px) / 8);
+    }
+  }
+
+  @container (max-width: 1060px) {
+    .strip-item,
+    .strip-wide {
+      width: calc((100cqi - 5 * 16px) / 6);
+    }
+  }
+
+  @container (max-width: 860px) {
+    .strip-item,
+    .strip-wide {
+      width: calc((100cqi - 4 * 16px) / 5);
+    }
+  }
+
+  @container (max-width: 660px) {
+    .strip-item,
+    .strip-wide {
+      width: calc((100cqi - 3 * 16px) / 4);
+    }
+  }
+
+  @container (max-width: 460px) {
+    .strip-item,
+    .strip-wide {
+      width: calc((100cqi - 2 * 16px) / 3);
+    }
+  }
+
+  /* Сетка постеров (результаты поиска, подборки) */
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 28px 20px;
+  }
+
+  /* Первый блок под шапкой — без большого отступа. */
+  .content > .ptr + .pblock,
+  .home > .continue:first-child {
+    margin-top: 12px;
+  }
+
+  .card-title {
+    font-size: 15px;
+  }
+
+  /* Пустое состояние на вкладке — карточка по центру, а не строчка в огромной пустоте. */
+  .screen .content > .empty {
+    max-width: 560px;
+    margin: 56px auto 0;
+    padding: 48px 40px 52px;
+    border-radius: 24px;
+    background: var(--bg-elev);
+    gap: 10px;
+    line-height: 1.45;
+  }
+
+  .screen .content > .empty::before {
+    content: '';
+    width: 72px;
+    height: 72px;
+    margin-bottom: 8px;
+    border-radius: 50%;
+    background: var(--bg-elev2)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2.5'/%3E%3Cpath d='M7.5 5v14M16.5 5v14M3 9.5h4.5M3 14.5h4.5M16.5 9.5H21M16.5 14.5H21'/%3E%3C/svg%3E")
+      center / 34px no-repeat;
+  }
+
+  .screen .content > .empty .empty-title {
+    font-size: 22px;
+  }
+
+  /* ---- Библиотека ---- */
+
+  .library-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 420px) minmax(0, 1fr);
+    grid-template-areas:
+      'title seg controls'
+      'chips chips chips';
+    align-items: center;
+    column-gap: 28px;
+    row-gap: 16px;
+  }
+
+  .library-bar > h1 {
+    grid-area: title;
+  }
+
+  .library-bar > .segmented {
+    grid-area: seg;
+  }
+
+  .library-bar > .topbar-controls {
+    grid-area: controls;
+    justify-self: end;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .library-bar > .topbar-controls input,
+  .library-bar > .topbar-controls select {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .library-bar > .topbar-controls select {
+    flex: 0 0 220px;
+  }
+
+  .library-bar > .chips-row {
+    grid-area: chips;
+  }
+
+  .screen .rows {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 14px;
+  }
+
+  .screen .row {
+    padding: 4px 8px 4px 14px;
+    border-bottom: 0;
+    border-radius: 16px;
+    background: var(--bg-elev);
+  }
+
+  .screen .row:hover {
+    background: #232325;
+  }
+
+  .screen .row .progress {
+    background: var(--bg-elev2);
+  }
+
+  /* ---- Лента ---- */
+
+  .news {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .news-item {
+    display: flex;
+  }
+
+  .news-link {
+    flex: 1;
+    padding: 18px 20px;
+  }
+
+  .news-title {
+    font-size: 17px;
+  }
+
+  /* ---- Профиль ---- */
+
+  .profile-bar .profile-bar-spacer {
+    display: none;
+  }
+
+  .profile-name {
+    text-align: left;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* Шапка: аватар слева, счётчики плитками справа; ниже календарь за год, три раздела в ряд. */
+  .content.profile {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 24px;
+    align-content: start;
+  }
+
+  .content.profile > * {
+    grid-column: 1 / -1;
+  }
+
+  .content.profile > .ptr {
+    grid-row: 1;
+  }
+
+  .content.profile > .avatar {
+    grid-column: 1 / 3;
+    grid-row: 2 / span 2;
+    align-self: center;
+    justify-self: start;
+    width: min(120px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+
+  .content.profile > p.center {
+    grid-column: 3 / -1;
+    grid-row: 2;
+    align-self: end;
+    margin: 0 0 12px;
+    text-align: left;
+  }
+
+  .content.profile > .counters {
+    grid-column: 3 / -1;
+    grid-row: 3;
+    align-self: start;
+  }
+
+  .content.profile > .pblock:has(> .segmented-wide) {
+    grid-column: span 4;
+  }
+
+  .profile .counters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    max-width: none;
+    margin: 0;
+  }
+
+  .profile .counter {
+    padding: 16px 20px;
+    border-radius: 16px;
+    background: var(--bg-elev);
+  }
+
+  .profile .counter dt {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    font-size: 15px;
+  }
+
+  .profile .counter dt strong {
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.1;
+  }
+
+  /* Календарь за 52 недели во всю ширину карточки: размер клетки — от ширины. */
+  .profile .heatmap {
+    container-type: inline-size;
+    --gap: 4px;
+    --cell: min(16px, calc(100cqi / 52 - var(--gap)));
+    padding: 18px 22px 16px;
+    border-radius: 16px;
+    background: var(--bg-elev);
+  }
+
+  .profile .heatmap-legend .heatmap-cell {
+    width: 12px;
+    height: 12px;
+  }
+
+  .profile .pblock-empty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 14px;
+    padding: 14px 16px 14px 20px;
+    border-radius: 16px;
+    background: var(--bg-elev);
+    text-align: left;
+  }
+
+  .profile .pblock-empty .empty-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .btn-light {
+    width: auto;
+    padding: 10px 22px;
+    font-size: 15px;
+  }
+
+  .ach {
+    width: 136px;
+  }
+
+  .ach-art {
+    height: 136px;
+  }
+
+  /* ---- Карточка сериала: кадр во всю ширину и две колонки ---- */
+
+  .detail .content.detail-desk {
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+  }
+
+  /* Шапка «‹ Назад» поверх кадра; при прокрутке получает тёмную подложку. */
+  .detail[data-hero] > .nav-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 100%);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .detail[data-hero='top'] > .nav-bar .nav-title {
+    opacity: 0;
+  }
+
+  .detail[data-hero='scrolled'] > .nav-bar {
+    background: rgba(10, 10, 11, 0.86);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .detail[data-hero] > .nav-bar .nav-title {
+    transition: opacity 0.2s ease;
+  }
+
+  .dhero {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: flex-end;
+    min-height: min(500px, 62vh);
+    overflow: hidden;
+    background: radial-gradient(120% 140% at 85% 0%, #3a0d12 0%, #120708 45%, #000 80%);
+  }
+
+  .dhero-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 25%;
+    animation: fade-in 0.4s ease-out;
+  }
+
+  .dhero-shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.78) 30%, rgba(0, 0, 0, 0.25) 62%, rgba(0, 0, 0, 0.1) 100%),
+      linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.55) 22%, rgba(0, 0, 0, 0) 50%),
+      linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 22%);
+  }
+
+  .dhero-inner {
+    display: flex;
+    align-items: flex-end;
+    gap: 36px;
+    width: 100%;
+    padding: 72px max(32px, calc((100% - var(--page-max)) / 2)) 28px;
+  }
+
+  .dhero .dhero-poster {
+    flex: none;
+    width: 220px;
+    height: 330px;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+    outline: 1px solid rgba(255, 255, 255, 0.08);
+    outline-offset: -1px;
+  }
+
+  .dhero-body {
+    flex: 1;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+
+  .dhero .detail-kind {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .dhero .hero-title {
+    max-width: 18em;
+    font-size: 46px;
+    line-height: 1.06;
+    letter-spacing: -0.025em;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .dhero-original {
+    margin-top: -2px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 16px;
+  }
+
+  .dhero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 0;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 16px;
+  }
+
+  .dhero-meta > span + span::before {
+    content: '·';
+    margin: 0 10px;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .dhero-meta .hero-rating {
+    font-size: 17px;
+  }
+
+  .dhero-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .dhero-genre {
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .dhero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .dhero-actions .btn,
+  .dhero-actions .btn-wide {
+    width: auto;
+    min-height: 48px;
+    margin: 0;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  .dhero-actions .btn-primary {
+    box-shadow: 0 8px 24px rgba(229, 32, 46, 0.35);
+  }
+
+  .dhero-actions .btn-search {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .dhero-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 12px;
+    background: rgba(229, 32, 46, 0.2);
+    color: #ff5a64;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .dhero-status svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .detail-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    align-items: start;
+    gap: 48px;
+    padding: 0 max(32px, calc((100% - var(--page-max)) / 2));
+  }
+
+  .detail-desk .block {
+    margin-top: 36px;
+  }
+
+  .detail-desk .block > h2,
+  .detail-side .ios-section-title {
+    margin: 0 0 14px;
+    color: var(--text);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-transform: none;
+  }
+
+  .detail-side .ios-section {
+    margin-top: 36px;
+  }
+
+  .detail-side .ios-footer {
+    margin-left: 4px;
+  }
+
+  .detail-desk .overview {
+    max-width: 72ch;
+    color: #e5e5ea;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .detail-desk .trailer,
+  .detail-desk .trailer-name,
+  .detail-desk .trailer-chips {
+    max-width: 780px;
+  }
+
+  .detail-desk .cast-strip {
+    gap: 18px;
+  }
+
+  .detail-desk .cast-item {
+    width: 104px;
+  }
+
+  .detail-desk .cast-photo {
+    width: 92px;
+    height: 92px;
+  }
+
+  /* ---- Шторки → окна по центру ---- */
+
+  .bs-root {
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .bs-root .bs-sheet {
+    width: 100%;
+    max-width: 520px;
+    max-height: calc(100vh - 80px);
+    padding: 0 20px 20px;
+    border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    animation: dsk-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .bs-root[data-state='closing'] .bs-sheet {
+    transform: scale(0.96);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  .bs-root .bs-grab {
+    height: 52px;
+    margin: 0 -20px;
+    padding: 0;
+    border-radius: 20px 20px 0 0;
+    cursor: default;
+  }
+
+  .bs-root .bs-grab::before {
+    display: none;
+  }
+
+  /* Кнопка «Закрыть» видна всегда: на компьютере свайпа нет. */
+  .bs-root .bs-sr-close,
+  .bs-root .bs-sr-close:focus-visible {
+    top: 12px;
+    left: auto;
+    right: 14px;
+    z-index: 3;
+    width: auto;
+    height: 30px;
+    padding: 0 14px;
+    overflow: visible;
+    clip-path: none;
+    border-radius: 15px;
+    background: var(--bg-elev2);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .bs-root .bs-sr-close:hover {
+    background: #3a3a3c;
+  }
+
+  .fs-backdrop {
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .fs-sheet {
+    flex: 0 1 auto;
+    max-width: 520px;
+    max-height: min(760px, calc(100vh - 80px));
+    margin: 0 auto;
+    border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    animation: dsk-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .fs-body {
+    padding-bottom: 20px;
+  }
+
+  @keyframes dsk-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* Большой монитор: страница шире, чтобы по бокам не оставались пустые поля. */
+@media (min-width: 1680px) {
+  :root {
+    --side-w: 248px;
+    --page-max: 1440px;
+  }
+}
+
+/* Узкий компьютер (1024–1279): меньше колонок и подписи помельче. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root {
+    --side-w: 208px;
+  }
+
+  .cat-title {
+    font-size: 24px;
+  }
+
+  .topbar:has(.cat-head) .segmented {
+    width: 210px;
+  }
+
+  .rec {
+    width: calc((100% - 2 * 16px) / 3);
+  }
+
+  .detail-cols {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 32px;
+  }
+
+  .dhero .hero-title {
+    font-size: 38px;
+  }
+
+  .dhero .dhero-poster {
+    width: 190px;
+    height: 285px;
+  }
+
+  /* Поиск и сортировка библиотеки — второй строкой, иначе им не хватает места. */
+  .library-bar {
+    grid-template-columns: auto minmax(0, 400px) minmax(0, 1fr);
+    grid-template-areas:
+      'title seg .'
+      'controls controls controls'
+      'chips chips chips';
+    column-gap: 20px;
+  }
+
+  .library-bar > .topbar-controls {
+    justify-self: start;
+    max-width: 560px;
+  }
+}
+
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+  .bs-root .bs-sheet,
+  .fs-sheet,
+  .dhero-bg {
+    animation: none;
+  }
+}
+
+/* Страница жанра: кадр во всю ширину колонки, а не по пропорции 16:8 с потолком высоты */
+@media (min-width: 1024px) {
+  .genre-hero {
+    aspect-ratio: auto;
+    height: 340px;
+    max-height: none;
+    padding: 28px 32px;
+    border-radius: 22px;
+  }
+
+  .genre-hero-title {
+    font-size: 44px;
+  }
+
+  .genre-hero-sub {
+    font-size: 16px;
+  }
+
+  .genre-kinds {
+    max-width: 520px;
+  }
+}

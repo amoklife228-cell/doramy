@@ -15,6 +15,7 @@ const Notes = lazy(() => import('./screens/Notes').then((m) => ({ default: m.Not
 const History = lazy(() => import('./screens/History').then((m) => ({ default: m.History })));
 const Detail = lazy(() => import('./screens/Detail').then((m) => ({ default: m.Detail })));
 const Collection = lazy(() => import('./screens/Collection').then((m) => ({ default: m.Collection })));
+const Genre = lazy(() => import('./screens/Genre').then((m) => ({ default: m.Genre })));
 
 /** Пока чанк оверлея грузится — пустой чёрный экран того же слоя, без белой вспышки. */
 const overlayFallback = <div className="detail" />;
@@ -24,15 +25,16 @@ export default function App() {
   const session = useSession();
   useSyncLifecycle(!!session);
 
-  // Подборка остаётся под открытой карточкой: «Назад» вернёт к тому же месту списка, без перезагрузки.
-  const [keptCollection, setKeptCollection] = useState<Route['collection']>(null);
+  // Подборка или жанр остаются под открытой карточкой: «Назад» вернёт к тому же месту списка, без перезагрузки.
+  const [kept, setKept] = useState<Pick<Route, 'collection' | 'genre'> | null>(null);
   useEffect(() => {
-    if (route.collection) setKeptCollection(route.collection);
-    else if (!route.detail) setKeptCollection(null);
+    if (route.collection || route.genre) setKept({ collection: route.collection, genre: route.genre });
+    else if (!route.detail) setKept(null);
   }, [route]);
-  const collection = route.collection ?? (route.detail ? keptCollection : null);
+  const collection = route.collection ?? (route.detail ? (kept?.collection ?? null) : null);
+  const genre = route.genre ?? (route.detail ? (kept?.genre ?? null) : null);
 
-  const overlayOpen = route.detail !== null || route.overlay !== null || collection !== null;
+  const overlayOpen = route.detail !== null || route.overlay !== null || collection !== null || genre !== null;
 
   const screen = (tab: Tab, node: React.ReactNode) => (
     <section className="screen" data-active={route.tab === tab} aria-hidden={route.tab !== tab}>
@@ -68,6 +70,11 @@ export default function App() {
             mediaType={collection.mediaType}
             id={collection.id}
           />
+        </Suspense>
+      )}
+      {genre && (
+        <Suspense fallback={overlayFallback}>
+          <Genre key={genre.slug} kind={genre.kind} slug={genre.slug} sort={genre.sort} />
         </Suspense>
       )}
       {route.detail && (

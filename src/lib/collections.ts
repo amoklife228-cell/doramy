@@ -1,5 +1,5 @@
 import { detailsList, discoverAsia, trendingAsia, type Page } from './tmdb';
-import { itemKey, type Drama, type MediaType } from './types';
+import { DRAMA_TV_TYPES, itemKey, NOT_DRAMA, type Drama, type MediaType } from './types';
 
 /* Подборки главной каталога. Динамические собираются из TMDB, «Выбор редакции» и «Премии» — свои списки:
    готовых редакторских подборок и данных о наградах в TMDB нет. Награды сверены с Википедией
@@ -146,15 +146,11 @@ async function curatedPage(
 
 const TOP_MIN_VOTES: Record<MediaType, string> = { tv: '150', movie: '500' };
 
-/**
- * Без аниме, детского, новостей, реалити и ток-шоу: иначе японская анимация и шоу
- * занимают половину «ТОП-500» и «Сейчас обсуждают». Жанр «Анимация» в каталоге остаётся.
- */
-export const NOT_DRAMA: Record<MediaType, number[]> = {
-  tv: [16, 10762, 10763, 10764, 10767],
-  movie: [16],
-};
-const withoutNonDrama = (mediaType: MediaType) => ({ without_genres: NOT_DRAMA[mediaType].join(',') });
+/** Без аниме, детского, новостей, реалити и ток-шоу (NOT_DRAMA в types.ts). */
+const withoutNonDrama = (mediaType: MediaType): Record<string, string> => ({
+  without_genres: NOT_DRAMA[mediaType].join(','),
+  ...(mediaType === 'tv' ? { with_type: DRAMA_TV_TYPES } : {}),
+});
 
 export const COLLECTIONS: Record<CollectionId, Collection> = {
   new: {

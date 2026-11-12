@@ -8,6 +8,7 @@ import { IosRow, IosSection, IosSwitch } from '../components/IosList';
 import { NavBar } from '../components/NavBar';
 import { addToLibrary, db, refreshMetadata, removeEntry, updateEntry } from '../lib/db';
 import { useConfigured } from '../lib/hooks';
+import { useDesktop } from '../lib/media';
 import { goBack } from '../lib/router';
 import { details, dramaCache } from '../lib/tmdb';
 import {
@@ -71,9 +72,42 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
   const country = drama ? countryOf(drama.originCountries) : undefined;
   const airStatus = drama ? localizedAirStatus(drama.airStatus, mediaType) : null;
   const runtime = drama ? formatRuntime(drama.runtime) : null;
+  const desktop = useDesktop();
+  // На компьютере шапка лежит поверх кадра и темнеет, когда страницу прокрутили.
+  const [scrolled, setScrolled] = useState(false);
+
+  const info = drama && (
+    <IosSection
+      title="Информация"
+      footer={error ? `Подробности не загрузились: ${error}` : undefined}
+    >
+      {drama.originalTitle && drama.originalTitle !== drama.title && (
+        <InfoRow label="Оригинал" value={drama.originalTitle} />
+      )}
+      {country && <InfoRow label="Страна" value={country.title} />}
+      {drama.firstAirDate && <InfoRow label="Премьера" value={formatDate(drama.firstAirDate)} />}
+      {airStatus && <InfoRow label="Статус" value={airStatus} />}
+      {isMovie && runtime && <InfoRow label="Длительность" value={runtime} />}
+      {!isMovie && drama.episodeCount && (
+        <InfoRow
+          label="Серии"
+          value={drama.seasonCount ? `${drama.episodeCount} эп., сезонов: ${drama.seasonCount}` : `${drama.episodeCount} эп.`}
+        />
+      )}
+      {drama.genreNames.length > 0 && <InfoRow label="Жанры" value={drama.genreNames.join(', ')} />}
+      {drama.voteCount > 0 && (
+        <InfoRow label="Рейтинг TMDB" value={`★ ${drama.voteAverage.toFixed(1)} (${drama.voteCount})`} />
+      )}
+    </IosSection>
+  );
 
   return (
-    <div className="detail" role="dialog" aria-modal="true">
+    <div
+      className="detail"
+      role="dialog"
+      aria-modal="true"
+      data-hero={desktop && drama ? (scrolled ? 'scrolled' : 'top') : undefined}
+    >
       <NavBar title={isMovie ? 'Фильм' : 'Сериал'} right={<ShareButton drama={drama} />} />
 
       {!drama ? (
@@ -93,6 +127,32 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
           ) : (
             <HeroSkeleton />
           )}
+        </div>
+      ) : desktop ? (
+        <div
+          className="content detail-content detail-desk"
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 24)}
+        >
+          <DeskHero drama={drama} entry={entry} loadingEntry={loadingEntry} />
+          <div className="detail-cols">
+            <div className="detail-main">
+              {drama.overview && (
+                <section className="block">
+                  <h2>Описание</h2>
+                  <p className="overview">{drama.overview}</p>
+                </section>
+              )}
+              <TrailerBlock mediaType={mediaType} id={id} enabled={configured} />
+              <CastStrip mediaType={mediaType} id={id} enabled={configured} />
+              <SimilarStrip mediaType={mediaType} id={id} enabled={configured} libraryKeys={libraryKeys} />
+            </div>
+            <aside className="detail-side">
+              {entry && (
+                <EntryEditor entry={entry} episodeCount={isMovie ? undefined : (drama.episodeCount ?? entry.episodeCount)} />
+              )}
+              {info}
+            </aside>
+          </div>
         </div>
       ) : (
         <div className="content detail-content">
@@ -125,30 +185,88 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
           <CastStrip mediaType={mediaType} id={id} enabled={configured} />
           <SimilarStrip mediaType={mediaType} id={id} enabled={configured} libraryKeys={libraryKeys} />
 
-          <IosSection
-            title="Информация"
-            footer={error ? `Подробности не загрузились: ${error}` : undefined}
-          >
-            {drama.originalTitle && drama.originalTitle !== drama.title && (
-              <InfoRow label="Оригинал" value={drama.originalTitle} />
-            )}
-            {country && <InfoRow label="Страна" value={country.title} />}
-            {drama.firstAirDate && <InfoRow label="Премьера" value={formatDate(drama.firstAirDate)} />}
-            {airStatus && <InfoRow label="Статус" value={airStatus} />}
-            {isMovie && runtime && <InfoRow label="Длительность" value={runtime} />}
-            {!isMovie && drama.episodeCount && (
-              <InfoRow
-                label="Серии"
-                value={drama.seasonCount ? `${drama.episodeCount} эп., сезонов: ${drama.seasonCount}` : `${drama.episodeCount} эп.`}
-              />
-            )}
-            {drama.genreNames.length > 0 && <InfoRow label="Жанры" value={drama.genreNames.join(', ')} />}
-            {drama.voteCount > 0 && (
-              <InfoRow label="Рейтинг TMDB" value={`★ ${drama.voteAverage.toFixed(1)} (${drama.voteCount})`} />
-            )}
-          </IosSection>
+          {info}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Карточка на компьютере: широкий кадр (backdrop) с постером, названием и кнопками поверх него.
+ * Кнопки и подписи те же, что на телефоне, только в одну строку и обычной ширины.
+ */
+function DeskHero({
+  drama,
+  entry,
+  loadingEntry,
+}: {
+  drama: Drama;
+  entry: SavedDrama | null | undefined;
+  loadingEntry: boolean;
+}) {
+  const country = countryOf(drama.originCountries);
+  const year = yearOf(drama.firstAirDate);
+  const isMovie = drama.mediaType === 'movie';
+  const runtime = isMovie ? formatRuntime(drama.runtime) : null;
+  const backdrop = drama.backdropPath ? `https://image.tmdb.org/t/p/w1280${drama.backdropPath}` : null;
+  const status = entry ? STATUSES.find((s) => s.id === entry.status)?.title : null;
+  const meta = [
+    year,
+    country?.title,
+    runtime,
+    !isMovie && drama.episodeCount ? `${drama.episodeCount} эп.` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="dhero" data-backdrop={!!backdrop}>
+      {backdrop && <img className="dhero-bg" src={backdrop} alt="" decoding="async" draggable={false} />}
+      <div className="dhero-shade" aria-hidden="true" />
+      <div className="dhero-inner">
+        <Poster path={drama.posterPath} alt={drama.title} size="w500" className="hero-poster dhero-poster" />
+        <div className="hero-body dhero-body">
+          <div className="detail-kind">{isMovie ? 'Фильм' : 'Сериал'}</div>
+          <h1 className="hero-title">{drama.title}</h1>
+          {drama.originalTitle && drama.originalTitle !== drama.title && (
+            <div className="dhero-original">{drama.originalTitle}</div>
+          )}
+          <div className="dhero-meta">
+            {drama.voteAverage > 0 && <span className="hero-rating">★ {drama.voteAverage.toFixed(1)}</span>}
+            {meta.map((m) => (
+              <span key={String(m)}>{m}</span>
+            ))}
+          </div>
+          {drama.genreNames.length > 0 && (
+            <div className="dhero-genres">
+              {drama.genreNames.slice(0, 4).map((g) => (
+                <span key={g} className="dhero-genre">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="dhero-actions">
+            {loadingEntry ? null : entry ? (
+              <span className="dhero-status">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" />
+                </svg>
+                В библиотеке: {status}
+              </span>
+            ) : (
+              <AddButtons drama={drama} />
+            )}
+            <a
+              className="btn btn-search"
+              href={searchUrl(drama.title, drama.originalTitle, year, isMovie)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Найти в интернете
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

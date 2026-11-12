@@ -88,7 +88,30 @@ export const COUNTRIES: Country[] = [
 export function countryLabel(codes: string[]): string {
   const known = countryOf(codes);
   if (known) return known.title;
-  return codes[0] ?? '';
+  const code = codes[0];
+  if (!code) return '';
+  return SHORT_REGION[code] ?? regionName(code);
+}
+
+/** Короткие привычные названия вместо официальных («США», а не «Соединённые Штаты»). */
+const SHORT_REGION: Record<string, string> = { US: 'США', GB: 'Великобритания', KP: 'КНДР' };
+
+let regionNames: Intl.DisplayNames | null | undefined;
+
+/** Название страны по-русски по коду ISO («FR» → «Франция»); без поддержки Intl — сам код. */
+function regionName(code: string): string {
+  if (regionNames === undefined) {
+    try {
+      regionNames = new Intl.DisplayNames(['ru'], { type: 'region' });
+    } catch {
+      regionNames = null;
+    }
+  }
+  try {
+    return regionNames?.of(code) ?? code;
+  } catch {
+    return code;
+  }
 }
 
 export const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
@@ -140,6 +163,22 @@ export const GENRES_BY_TYPE: Record<MediaType, { id: number; title: string }[]> 
   tv: TV_GENRES,
   movie: MOVIE_GENRES,
 };
+
+/**
+ * Не дорамы и не кино: аниме, детское, новости, реалити и ток-шоу. По умолчанию каталог их не показывает,
+ * иначе японская анимация и шоу занимают половину любого списка. Выбранные явно (жанр «Анимация»,
+ * категория «Реалити») — показываются.
+ */
+export const NOT_DRAMA: Record<MediaType, number[]> = {
+  tv: [16, 99, 10762, 10763, 10764, 10767],
+  movie: [16, 99],
+};
+
+/**
+ * Тип сериала в TMDB (with_type): 4 — игровой, 2 — мини-сериал. Ток-шоу и документалки часто помечены
+ * лишь «Комедией» или «Драмой», поэтому одного исключения жанров мало.
+ */
+export const DRAMA_TV_TYPES = '2|4';
 
 export const GENRE_BY_ID = new Map([...TV_GENRES, ...MOVIE_GENRES].map((g) => [g.id, g.title]));
 

@@ -3,7 +3,9 @@ import {
   COUNTRY_CODES,
   GENRE_BY_ID,
   itemKey,
+  DRAMA_TV_TYPES,
   LANG_TO_COUNTRY,
+  NOT_DRAMA,
   WORLD,
   type DiscoverSort,
   type Drama,
@@ -419,6 +421,13 @@ export async function discover(p: DiscoverParams, signal?: AbortSignal): Promise
   };
   if (p.country !== WORLD) params.with_origin_country = p.country || COUNTRIES.map((c) => c.code).join('|');
   if (p.genre) params.with_genres = p.genre;
+  // Только дорамы, сериалы и кино: аниме, детское и шоу — лишь если их выбрали явно.
+  const nonDrama = NOT_DRAMA[p.mediaType];
+  const showCategory = p.category === '3' || p.category === '0' || p.category === '5'; // реалити, док., ток-шоу
+  if (!nonDrama.includes(Number(p.genre)) && !showCategory) {
+    params.without_genres = nonDrama.join(',');
+    if (p.mediaType === 'tv' && !p.category) params.with_type = DRAMA_TV_TYPES;
+  }
   if (p.year) params[p.mediaType === 'tv' ? 'first_air_date_year' : 'primary_release_year'] = p.year;
   if (p.mediaType === 'tv') {
     params.include_null_first_air_dates = 'false';
@@ -627,7 +636,17 @@ export async function recommendations(
 ): Promise<Drama[]> {
   const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/recommendations`, { page: String(page) }, signal);
   if (r.results.length === 0 && page > 1) return recommendations(mediaType, id, signal, 1);
-  return localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+  return localizeTitles(dropNonDrama(mediaType, r.results).map((d) => toDrama(mediaType, d)), signal);
+}
+
+/**
+ * Убирает аниме, детское и шоу из рекомендаций. Если после этого почти ничего не осталось,
+ * значит, исходный тайтл сам такой (например, аниме в избранном) — тогда оставляем как есть.
+ */
+function dropNonDrama<T extends { genre_ids?: number[] }>(mediaType: MediaType, results: T[]): T[] {
+  const nonDrama = NOT_DRAMA[mediaType];
+  const clean = results.filter((d) => !(d.genre_ids ?? []).some((g) => nonDrama.includes(g)));
+  return clean.length >= Math.min(4, results.length) ? clean : results;
 }
 
 export interface CastMember {
@@ -674,7 +693,7 @@ export async function similarTo(mediaType: MediaType, id: number, signal?: Abort
   // Мало рекомендаций или мало азиатских среди них — добираем из «similar».
   if (list.length < 4 || list.filter(isAsian).length < 6) {
     const r = await fetchJSON<ListResponse>(`/${mediaType}/${id}/similar`, { page: '1' }, signal);
-    const extra = await localizeTitles(r.results.map((d) => toDrama(mediaType, d)), signal);
+    const extra = await localizeTitles(dropNonDrama(mediaType, r.results).map((d) => toDrama(mediaType, d)), signal);
     const seen = new Set(list.map((d) => d.id));
     list = [...list, ...extra.filter((d) => !seen.has(d.id))];
   }

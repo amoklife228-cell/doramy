@@ -2793,3 +2793,65 @@ code {
   text-align: center;
   padding: 0 8px;
 }
+
+/* Страница жанра (#/genre/...): кадр жанра сверху, разделы и сортировка */
+.genre-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  aspect-ratio: 16 / 8;
+  min-height: 180px;
+  max-height: 340px;
+  margin: 4px 0 16px;
+  padding: 18px;
+  border-radius: 18px;
+  color: #fff;
+}
+
+.genre-hero-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.genre-hero-img[data-loaded='true'] {
+  opacity: 1;
+}
+
+.genre-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+.genre-hero-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.genre-hero-sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.genre-kinds {
+  margin-bottom: 12px;
+}
+
+.genre-sorts {
+  margin-bottom: 16px;
+}

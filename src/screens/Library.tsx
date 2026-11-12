@@ -141,7 +141,7 @@ export function Library({
 
   return (
     <>
-      <header className="topbar">
+      <header className="topbar library-bar">
         <h1>Библиотека</h1>
         <div className="segmented segmented-wide" role="tablist">
           {LIBRARY_KINDS.map((k) => (

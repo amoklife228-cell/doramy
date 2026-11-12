@@ -10,8 +10,9 @@ import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
 import { useConfigured, useDebounced } from '../lib/hooks';
-import { openDrama } from '../lib/router';
-import { backdropUrl, discover, discoverAsia, randomPick, recommendations, remember, search } from '../lib/tmdb';
+import { GENRE_CARDS, GENRES, useGenreArt, type GenreSlug } from '../lib/genres';
+import { openDrama, openGenre } from '../lib/router';
+import { backdropUrl, discover, randomPick, recommendations, remember, search } from '../lib/tmdb';
 import {
   COUNTRIES,
   countryLabel,
@@ -33,38 +34,19 @@ import { usePagedList } from '../lib/usePagedList';
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = [THIS_YEAR, THIS_YEAR - 1, THIS_YEAR - 2].map(String);
 
-/** Карточки жанров на главной каталога: id жанра TMDB, подпись, цвета. */
-const GENRE_CARDS: Record<MediaType, { id: number; title: string; from: string; to: string }[]> = {
-  tv: [
-    { id: 9648, title: 'Детектив', from: '#3b2a6e', to: '#1a1535' },
-    { id: 10766, title: 'Мелодрама', from: '#7a2a52', to: '#2d1020' },
-    { id: 35, title: 'Комедия', from: '#8a5a12', to: '#2f1f08' },
-    { id: 10765, title: 'Фантастика', from: '#14506b', to: '#0a1e2a' },
-    { id: 10759, title: 'Боевик', from: '#7a2424', to: '#2b0d0d' },
-    { id: 18, title: 'Драма', from: '#2f5d3a', to: '#102015' },
-    { id: 10751, title: 'Семейный', from: '#5a4a1f', to: '#1f1a0a' },
-    { id: 16, title: 'Анимация', from: '#4a2a7a', to: '#1a0f2d' },
-  ],
-  movie: [
-    { id: 53, title: 'Триллер', from: '#3b2a6e', to: '#1a1535' },
-    { id: 10749, title: 'Мелодрама', from: '#7a2a52', to: '#2d1020' },
-    { id: 35, title: 'Комедия', from: '#8a5a12', to: '#2f1f08' },
-    { id: 878, title: 'Фантастика', from: '#14506b', to: '#0a1e2a' },
-    { id: 28, title: 'Боевик', from: '#7a2424', to: '#2b0d0d' },
-    { id: 18, title: 'Драма', from: '#2f5d3a', to: '#102015' },
-    { id: 27, title: 'Ужасы', from: '#1f1f1f', to: '#0a0a0a' },
-    { id: 16, title: 'Анимация', from: '#4a2a7a', to: '#1a0f2d' },
-  ],
-};
-
-/** Настроение → жанр. */
-const MOODS: { title: string; genre: Record<MediaType, number>; sort?: DiscoverSort }[] = [
-  { title: 'Посмеяться', genre: { tv: 35, movie: 35 } },
-  { title: 'Романтики', genre: { tv: 10766, movie: 10749 } },
-  { title: 'Пощекотать нервы', genre: { tv: 9648, movie: 53 } },
-  { title: 'Вдохновиться', genre: { tv: 10759, movie: 12 } },
-  { title: 'Погрустить', genre: { tv: 18, movie: 18 }, sort: 'topRated' },
+/** Настроение → страница жанра. */
+const MOODS: { title: string; genre: Record<MediaType, GenreSlug>; sort?: DiscoverSort }[] = [
+  { title: 'Посмеяться', genre: { tv: 'comedy', movie: 'comedy' } },
+  { title: 'Романтики', genre: { tv: 'romance', movie: 'romance' } },
+  { title: 'Пощекотать нервы', genre: { tv: 'detective', movie: 'thriller' } },
+  { title: 'Вдохновиться', genre: { tv: 'action', movie: 'action' } },
+  { title: 'Погрустить', genre: { tv: 'drama', movie: 'drama' }, sort: 'topRated' },
 ];
+
+/** Картинка жанра открывает его каталог: на «Сериалах» — раздел «Дорамы», на «Фильмах» — «Фильмы». */
+function openGenreFor(mediaType: MediaType, slug: GenreSlug, sort?: DiscoverSort) {
+  openGenre(mediaType === 'movie' ? 'movie' : 'dorama', slug, sort);
+}
 
 export function Catalog() {
   const configured = useConfigured();
@@ -129,11 +111,6 @@ export function Catalog() {
 
   const reset = () => {
     setF(DEFAULT_FILTERS);
-    setText('');
-  };
-
-  const pickGenre = (id: number, s?: DiscoverSort) => {
-    setF({ genre: String(id), ...(s ? { sort: s } : {}) });
     setText('');
   };
 
@@ -281,7 +258,7 @@ export function Catalog() {
         ) : (
           <>
             <InstallHint />
-            <CatalogHome mediaType={mediaType} library={library} onGenre={pickGenre} refreshKey={homeRefresh} />
+            <CatalogHome mediaType={mediaType} library={library} refreshKey={homeRefresh} />
           </>
         )}
       </Refreshable>
@@ -421,12 +398,10 @@ async function buildRecs(
 function CatalogHome({
   mediaType,
   library,
-  onGenre,
   refreshKey,
 }: {
   mediaType: MediaType;
   library: SavedDrama[];
-  onGenre: (id: number, sort?: DiscoverSort) => void;
   refreshKey: number;
 }) {
   const configured = useConfigured();
@@ -520,16 +495,19 @@ function CatalogHome({
       {mediaType === 'tv' && <ContinueWatching library={library} />}
 
       <div className="genre-cards">
-        {GENRE_CARDS[mediaType].map((g) => (
-          <GenreCard
-            key={`${mediaType}:${g.id}`}
-            title={g.title}
-            from={g.from}
-            to={g.to}
-            backdrop={genreArt[g.id]}
-            onClick={() => onGenre(g.id)}
-          />
-        ))}
+        {GENRE_CARDS[mediaType].map((slug) => {
+          const g = GENRES[slug];
+          return (
+            <GenreCard
+              key={`${mediaType}:${slug}`}
+              title={g.title}
+              from={g.from}
+              to={g.to}
+              backdrop={genreArt[slug]}
+              onClick={() => openGenreFor(mediaType, slug)}
+            />
+          );
+        })}
       </div>
 
       <section className="pblock">
@@ -580,7 +558,7 @@ function CatalogHome({
       <section className="moods" style={moodBg ? { backgroundImage: `url(${backdropUrl(moodBg)})` } : undefined}>
         <div className="moods-inner">
           {MOODS.map((m) => (
-            <button key={m.title} className="mood" onClick={() => onGenre(m.genre[mediaType], m.sort)}>
+            <button key={m.title} className="mood" onClick={() => openGenreFor(mediaType, m.genre[mediaType], m.sort)}>
               {m.title}
             </button>
           ))}
@@ -632,91 +610,6 @@ function RecCard({ drama }: { drama: Drama }) {
       <div className="rec-sub">{[year, countryLabel(drama.originCountries)].filter(Boolean).join(' · ')}</div>
     </button>
   );
-}
-
-/* ---------- кадры для карточек жанров ----------
- * Каждой карточке — кадр (backdrop) из самого популярного азиатского сериала или фильма этого жанра.
- * Кадры не повторяются между жанрами и хранятся на устройстве неделю, поэтому появляются сразу.
- */
-
-type GenreArt = Record<number, string>; // id жанра → backdrop_path
-const GENRE_ART_KEY = 'doramy.genreArt.v1.';
-const GENRE_ART_TTL = 7 * 24 * 60 * 60 * 1000;
-const ANIMATION = 16;
-
-function readGenreArt(mediaType: MediaType): GenreArt | null {
-  try {
-    const raw = JSON.parse(localStorage.getItem(GENRE_ART_KEY + mediaType) ?? 'null') as { at: number; art: GenreArt } | null;
-    return raw && Date.now() - raw.at < GENRE_ART_TTL ? raw.art : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeGenreArt(mediaType: MediaType, art: GenreArt) {
-  try {
-    localStorage.setItem(GENRE_ART_KEY + mediaType, JSON.stringify({ at: Date.now(), art }));
-  } catch {
-    // приватный режим: просто загрузим заново в следующий раз
-  }
-}
-
-async function loadGenreArt(
-  mediaType: MediaType,
-  signal: AbortSignal,
-): Promise<{ art: GenreArt; complete: boolean }> {
-  const cards = GENRE_CARDS[mediaType];
-  const lists = await Promise.all(
-    cards.map((g) =>
-      discoverAsia(
-        mediaType,
-        {
-          with_genres: String(g.id),
-          sort_by: 'popularity.desc',
-          'vote_count.gte': mediaType === 'tv' ? '80' : '300',
-          // Аниме-кадр в «Драме» или «Детективе» выглядит чужим; у «Анимации» — наоборот.
-          ...(g.id === ANIMATION ? {} : { without_genres: String(ANIMATION) }),
-        },
-        1,
-        signal,
-        0, // нужны только кадры, русские названия не ищем
-      ).catch((e: Error) => {
-        if (e.name === 'AbortError') throw e;
-        return null;
-      }),
-    ),
-  );
-  // Раздаём по очереди: каждому жанру — самый популярный кадр, ещё не занятый другим жанром.
-  const used = new Set<string>();
-  const art: GenreArt = {};
-  cards.forEach((g, i) => {
-    const pick = (lists[i]?.items ?? []).find((d) => d.backdropPath && !used.has(d.backdropPath));
-    if (pick?.backdropPath) {
-      used.add(pick.backdropPath);
-      art[g.id] = pick.backdropPath;
-    }
-  });
-  return { art, complete: lists.every((l) => l !== null) };
-}
-
-function useGenreArt(mediaType: MediaType, enabled: boolean): GenreArt {
-  const [art, setArt] = useState<GenreArt>(() => readGenreArt(mediaType) ?? {});
-  useEffect(() => {
-    const cached = readGenreArt(mediaType);
-    setArt(cached ?? {});
-    if (cached || !enabled) return;
-    const controller = new AbortController();
-    loadGenreArt(mediaType, controller.signal)
-      .then(({ art: a, complete }) => {
-        if (Object.keys(a).length === 0) return;
-        // Неполный набор (часть запросов не прошла) показываем, но не запоминаем на неделю.
-        if (complete) writeGenreArt(mediaType, a);
-        setArt(a);
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, [mediaType, enabled]);
-  return art;
 }
 
 function GenreCard({

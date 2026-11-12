@@ -5,10 +5,14 @@ import App from './App';
 import { applyAppearance, loadAppearance } from './lib/appearance';
 import { fixLibraryTitles } from './lib/db';
 import { installEdgeSwipe } from './lib/edgeSwipe';
+import { installStripArrows } from './lib/stripArrows';
 import './styles.css';
+// Раскладка для компьютера: только внутри медиазапросов, телефонный вид не меняет.
+import './desktop.css';
 
 applyAppearance(loadAppearance());
 installEdgeSwipe();
+installStripArrows();
 // iOS возвращает приложение с экрана «Домой» из памяти без перезагрузки, и браузер сам
 // не проверяет новую версию. Проверяем при каждом возвращении в приложение и раз в час.
 registerSW({

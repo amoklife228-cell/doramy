@@ -44,7 +44,16 @@ const TABS: { id: Tab; title: string; icon: React.ReactNode }[] = [
 
 export function TabBar({ active, hidden }: { active: Tab; hidden: boolean }) {
   return (
-    <nav className="tabbar" data-hidden={hidden}>
+    <nav className="tabbar" data-hidden={hidden} aria-label="Разделы">
+      {/* Название приложения в боковом меню на компьютере; на телефоне скрыто (desktop.css). */}
+      <div className="tabbar-brand" aria-hidden="true">
+        <span className="tabbar-logo">
+          <svg viewBox="0 0 24 24">
+            <path d="M9 7.5v9l7.5-4.5z" />
+          </svg>
+        </span>
+        Дорамы
+      </div>
       {TABS.map((t) => (
         <button
           key={t.id}
