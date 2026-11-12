@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Ambient } from '../components/Ambient';
 import { CastStrip, ShareButton, SimilarStrip } from '../components/DetailExtras';
 import { Poster } from '../components/Poster';
+import { PosterViewer } from '../components/PosterViewer';
 import { TrailerBlock } from '../components/TrailerBlock';
 import { EmptyState, NotConfigured } from '../components/DramaGrid';
 import { IosRow, IosSection, IosSwitch } from '../components/IosList';
@@ -108,6 +110,7 @@ export function Detail({ mediaType, id }: { mediaType: MediaType; id: number }) 
       aria-modal="true"
       data-hero={desktop && drama ? (scrolled ? 'scrolled' : 'top') : undefined}
     >
+      {desktop && drama?.backdropPath && <Ambient path={drama.backdropPath} />}
       <NavBar title={isMovie ? 'Фильм' : 'Сериал'} right={<ShareButton drama={drama} />} />
 
       {!drama ? (
@@ -223,7 +226,7 @@ function DeskHero({
       {backdrop && <img className="dhero-bg" src={backdrop} alt="" decoding="async" draggable={false} />}
       <div className="dhero-shade" aria-hidden="true" />
       <div className="dhero-inner">
-        <Poster path={drama.posterPath} alt={drama.title} size="w500" className="hero-poster dhero-poster" />
+        <HeroPoster drama={drama} className="hero-poster dhero-poster" />
         <div className="hero-body dhero-body">
           <div className="detail-kind">{isMovie ? 'Фильм' : 'Сериал'}</div>
           <h1 className="hero-title">{drama.title}</h1>
@@ -271,6 +274,25 @@ function DeskHero({
   );
 }
 
+/** Постер в шапке карточки: нажатие открывает его во весь экран. */
+function HeroPoster({ drama, className }: { drama: Drama; className: string }) {
+  const [open, setOpen] = useState(false);
+  if (!drama.posterPath) return <Poster path={null} alt={drama.title} size="w500" className={className} />;
+  return (
+    <>
+      <button
+        type="button"
+        className={`poster-open ${className}`}
+        onClick={() => setOpen(true)}
+        aria-label={`Открыть постер «${drama.title}»`}
+      >
+        <Poster path={drama.posterPath} alt={drama.title} size="w500" />
+      </button>
+      {open && <PosterViewer path={drama.posterPath} title={drama.title} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 function HeroSkeleton() {
   return (
     <div className="hero" aria-busy="true" aria-label="Загружаем">
@@ -289,7 +311,7 @@ function Hero({ drama }: { drama: Drama }) {
   const year = yearOf(drama.firstAirDate);
   return (
     <div className="hero">
-      <Poster path={drama.posterPath} alt={drama.title} size="w500" className="hero-poster" />
+      <HeroPoster drama={drama} className="hero-poster" />
       <div className="hero-body">
         <h1 className="hero-title">{drama.title}</h1>
         <div className="muted">{[year, country?.title].filter(Boolean).join(' · ')}</div>

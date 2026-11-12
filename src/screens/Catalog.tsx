@@ -6,6 +6,10 @@ import { ContinueWatching } from '../components/ContinueWatching';
 import { countActive, FilterSheet } from '../components/FilterSheet';
 import { HOME_BOTTOM, HOME_TOP } from '../lib/collections';
 import { InstallHint } from '../components/InstallHint';
+import { Ambient } from '../components/Ambient';
+import { FeaturedHero } from '../components/FeaturedHero';
+import { SectionIcon } from '../components/SectionIcon';
+import { useDesktop } from '../lib/media';
 import { Poster } from '../components/Poster';
 import { Refreshable } from '../components/Refreshable';
 import { db } from '../lib/db';
@@ -59,6 +63,9 @@ export function Catalog() {
   const [randomBusy, setRandomBusy] = useState(false);
   const [randomError, setRandomError] = useState<string | null>(null);
   const [homeRefresh, setHomeRefresh] = useState(0);
+  // На компьютере: баннер наверху и цветное свечение от его текущего кадра.
+  const desktop = useDesktop();
+  const [ambient, setAmbient] = useState<string | null>(null);
 
   useEffect(() => {
     if (!randomError) return;
@@ -154,6 +161,7 @@ export function Catalog() {
 
   return (
     <>
+      {desktop && !resultsMode && <Ambient path={ambient} />}
       <header className="topbar">
         <div className="topbar-row cat-head">
           <span className="profile-bar-spacer" />
@@ -258,7 +266,13 @@ export function Catalog() {
         ) : (
           <>
             <InstallHint />
-            <CatalogHome mediaType={mediaType} library={library} refreshKey={homeRefresh} />
+            <CatalogHome
+              mediaType={mediaType}
+              library={library}
+              refreshKey={homeRefresh}
+              desktop={desktop}
+              onBackdrop={setAmbient}
+            />
           </>
         )}
       </Refreshable>
@@ -399,10 +413,14 @@ function CatalogHome({
   mediaType,
   library,
   refreshKey,
+  desktop,
+  onBackdrop,
 }: {
   mediaType: MediaType;
   library: SavedDrama[];
   refreshKey: number;
+  desktop: boolean;
+  onBackdrop: (path: string | null) => void;
 }) {
   const configured = useConfigured();
   const genreArt = useGenreArt(mediaType, configured);
@@ -492,6 +510,9 @@ function CatalogHome({
 
   return (
     <div className="home">
+      {desktop && configured && (
+        <FeaturedHero mediaType={mediaType} libraryKeys={libraryKeys} refreshKey={refreshKey} onBackdrop={onBackdrop} />
+      )}
       {mediaType === 'tv' && <ContinueWatching library={library} />}
 
       <div className="genre-cards">
@@ -510,9 +531,12 @@ function CatalogHome({
         })}
       </div>
 
-      <section className="pblock">
+      <section className="pblock" data-accent="recs">
         <div className="home-head">
-          <h2 className="home-h2">{recs?.title ?? 'Рекомендации для тебя'}</h2>
+          <h2 className="home-h2">
+            <SectionIcon accent="recs" />
+            {recs?.title ?? 'Рекомендации для тебя'}
+          </h2>
           {configured && (
             <button
               className="icon-btn refresh-btn"
@@ -557,8 +581,14 @@ function CatalogHome({
 
       <section className="moods" style={moodBg ? { backgroundImage: `url(${backdropUrl(moodBg)})` } : undefined}>
         <div className="moods-inner">
-          {MOODS.map((m) => (
-            <button key={m.title} className="mood" onClick={() => openGenreFor(mediaType, m.genre[mediaType], m.sort)}>
+          <h2 className="moods-title">Под настроение</h2>
+          {MOODS.map((m, i) => (
+            <button
+              key={m.title}
+              className="mood"
+              data-mood={i}
+              onClick={() => openGenreFor(mediaType, m.genre[mediaType], m.sort)}
+            >
               {m.title}
             </button>
           ))}

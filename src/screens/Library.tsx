@@ -212,7 +212,7 @@ function LibraryRow({ item }: { item: SavedDrama }) {
         : '';
 
   return (
-    <li className="row">
+    <li className="row" data-status={item.status}>
       <button className="row-main" onClick={() => openDrama(item.mediaType, item.tmdbId)}>
         <Poster path={item.posterPath} alt={item.title} size="w185" className="row-poster" />
         <div className="row-body">

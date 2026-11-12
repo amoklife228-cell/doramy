@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { Ambient } from '../components/Ambient';
 import { NavBar } from '../components/NavBar';
+import { useDesktop } from '../lib/media';
 import { Refreshable } from '../components/Refreshable';
 import { GENRE_KINDS, GENRES, genreFor, isGenreSlug, kindMediaType, useGenreArt } from '../lib/genres';
 import { useConfigured } from '../lib/hooks';
@@ -36,6 +38,7 @@ export function Genre({ kind: routeKind, slug, sort }: { kind: LibraryKind; slug
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const desktop = useDesktop();
   const art = useGenreArt(mediaType, configured);
   const backdrop = genre ? art[genre.slug] : undefined;
 
@@ -59,6 +62,7 @@ export function Genre({ kind: routeKind, slug, sort }: { kind: LibraryKind; slug
 
   return (
     <div className="detail genre-page" role="dialog" aria-modal="true" aria-label={genre.pageTitle}>
+      {desktop && <Ambient path={backdrop} tint={genre.from} />}
       <NavBar backLabel="Каталог" />
       <Refreshable
         className="detail-content ios-page"

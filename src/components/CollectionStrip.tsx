@@ -4,10 +4,26 @@ import { openCollection, openDrama } from '../lib/router';
 import { remember } from '../lib/tmdb';
 import { itemKey, yearOf, type Drama, type MediaType } from '../lib/types';
 import { Poster } from './Poster';
+import { SectionIcon } from './SectionIcon';
 
 const STRIP_COUNT = 15;
 const STRIP_TTL = 30 * 60 * 1000;
 const stripCache = new Map<string, { items: Drama[]; at: number; ttl: number }>();
+
+/**
+ * Первая страница подборки через тот же кэш, что и у лент (главный баннер каталога
+ * берёт «В тренде» отсюда, и лента ниже не делает второй запрос).
+ */
+export async function loadCollectionItems(id: CollectionId, mediaType: MediaType, signal: AbortSignal): Promise<Drama[]> {
+  const cacheKey = `${mediaType}:${id}`;
+  const cached = stripCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < cached.ttl) return cached.items;
+  const r = await COLLECTIONS[id].fetchPage(mediaType, 1, signal);
+  const list = r.items.slice(0, STRIP_COUNT);
+  remember(list);
+  stripCache.set(cacheKey, { items: list, at: Date.now(), ttl: r.partial ? 60_000 : STRIP_TTL });
+  return list;
+}
 
 /**
  * Горизонтальная лента подборки на главной каталога: заголовок с «Все ›» и постеры.
@@ -79,9 +95,12 @@ export function CollectionStrip({
     .filter(({ d }) => collection.ranked || !libraryKeys.has(itemKey(d.mediaType, d.id)));
 
   return (
-    <section className="pblock" ref={ref}>
+    <section className="pblock" ref={ref} data-accent={id} data-ranked={collection.ranked ? 'true' : undefined}>
       <button className="pblock-head pblock-link" onClick={() => openCollection(mediaType, id)}>
-        <h2>{title}</h2>
+        <h2>
+          <SectionIcon accent={id} />
+          {title}
+        </h2>
         <span className="strip-all">
           Все
           <svg viewBox="0 0 8 14" fill="none" aria-hidden="true">
@@ -115,7 +134,11 @@ export function CollectionStrip({
               <button key={itemKey(d.mediaType, d.id)} className="strip-item" onClick={() => openDrama(d.mediaType, d.id)}>
                 <span className="strip-poster-wrap">
                   <Poster path={d.posterPath} alt={d.title} size="w342" className="strip-poster" />
-                  {collection.ranked && <span className="rank-badge">{rank}</span>}
+                  {collection.ranked && (
+                    <span className="rank-badge" data-wide={rank >= 10 ? 'true' : undefined}>
+                      {rank}
+                    </span>
+                  )}
                   {d.voteAverage > 0 && <span className="badge">★ {d.voteAverage.toFixed(1)}</span>}
                 </span>
                 <span className="strip-title">{d.title}</span>

@@ -1,6 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { DramaGrid, EmptyState, NotConfigured } from '../components/DramaGrid';
+import { Ambient } from '../components/Ambient';
 import { NavBar } from '../components/NavBar';
+import { SectionIcon } from '../components/SectionIcon';
+import { useDesktop } from '../lib/media';
 import { Refreshable } from '../components/Refreshable';
 import { COLLECTIONS, isCollectionId } from '../lib/collections';
 import { useConfigured } from '../lib/hooks';
@@ -25,8 +28,13 @@ export function Collection({ mediaType, id }: { mediaType: MediaType; id: string
   );
   const list = usePagedList(`${configured}|col:${mediaType}:${id}`, configured && collection ? fetcher : null);
 
+  // На компьютере за заголовком — свечение от кадра первой карточки и цветной значок подборки.
+  const desktop = useDesktop();
+  const glow = list.items.find((d) => d.backdropPath)?.backdropPath ?? null;
+
   return (
-    <div className="detail" role="dialog" aria-modal="true">
+    <div className="detail" role="dialog" aria-modal="true" data-accent={collection?.id}>
+      {desktop && collection && <Ambient path={glow} />}
       <NavBar backLabel="Каталог" />
       <Refreshable className="detail-content ios-page" onRefresh={() => {
         list.reload();
@@ -36,7 +44,10 @@ export function Collection({ mediaType, id }: { mediaType: MediaType; id: string
           <EmptyState title="Подборка не найдена" />
         ) : (
           <>
-            <h1 className="ios-large-title">{collection.title[mediaType]}</h1>
+            <h1 className="ios-large-title">
+              <SectionIcon accent={collection.id} />
+              {collection.title[mediaType]}
+            </h1>
             <p className="collection-sub">{collection.subtitle[mediaType]}</p>
             {!configured ? (
               <NotConfigured />

@@ -3,6 +3,7 @@ import { updateEntry } from '../lib/db';
 import { openDrama } from '../lib/router';
 import type { SavedDrama } from '../lib/types';
 import { Poster } from './Poster';
+import { SectionIcon } from './SectionIcon';
 
 /**
  * «Продолжить смотреть» на главной каталога: сериалы со статусом «Смотрю», свежие сверху.
@@ -33,9 +34,12 @@ export function ContinueWatching({ library }: { library: SavedDrama[] }) {
   };
 
   return (
-    <section className="pblock continue">
+    <section className="pblock continue" data-accent="continue">
       <div className="pblock-head">
-        <h2>Продолжить смотреть</h2>
+        <h2>
+          <SectionIcon accent="continue" />
+          Продолжить смотреть
+        </h2>
       </div>
       <div className="continue-strip">
         {watching.map((s) => {

@@ -157,7 +157,7 @@ export function installEdgeSwipe(): void {
     if (t.clientX > EDGE) return;
     // Открыта шторка или фильтр поверх — свайп назад не нужен.
     // Поверх открыта шторка (меню профиля, достижение) или фильтр каталога — свайп не перехватываем.
-    if (document.querySelector('.bs-root, .fs-backdrop, .sheet-backdrop, .filter')) return;
+    if (document.querySelector('.bs-root, .fs-backdrop, .sheet-backdrop, .filter, .pv-root')) return;
     const found = topOverlays();
     if (!found.top) return;
     top = found.top;

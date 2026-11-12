@@ -131,7 +131,9 @@ function NewsCard({ n }: { n: NewsItem }) {
           <span className="news-time">{timeAgo(n.publishedAt)}</span>
         </div>
         <div className="news-title">{n.title}</div>
-        <div className="news-tag">{n.tag}</div>
+        <div className="news-tag" data-tag={n.tag}>
+          {n.tag}
+        </div>
       </a>
     </li>
   );
