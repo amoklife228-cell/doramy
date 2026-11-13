@@ -191,6 +191,11 @@ export const RowIcons = {
       <path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4" />
     </svg>
   ),
+  chart: (
+    <svg viewBox="0 0 24 24" {...s}>
+      <path d="M5 20V11M12 20V5M19 20v-6" strokeWidth={2.4} />
+    </svg>
+  ),
   /** «Итоги года»: вспышка с искрой. */
   sparkles: (
     <svg viewBox="0 0 24 24" {...s}>

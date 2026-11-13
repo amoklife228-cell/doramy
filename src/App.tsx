@@ -28,6 +28,7 @@ const Wrapped = lazy(() => import('./screens/Wrapped').then((m) => ({ default: m
 const Detail = lazy(() => import('./screens/Detail').then((m) => ({ default: m.Detail })));
 const Collection = lazy(() => import('./screens/Collection').then((m) => ({ default: m.Collection })));
 const Genre = lazy(() => import('./screens/Genre').then((m) => ({ default: m.Genre })));
+const Admin = lazy(() => import('./screens/Admin').then((m) => ({ default: m.Admin })));
 const Person = lazy(() => import('./screens/Person').then((m) => ({ default: m.Person })));
 
 /** Пока чанк оверлея грузится — пустой чёрный экран того же слоя, без белой вспышки. */
@@ -87,6 +88,11 @@ export default function App() {
       {route.overlay === 'wrapped' && (
         <Suspense fallback={overlayFallback}>
           <Wrapped />
+        </Suspense>
+      )}
+      {route.overlay === 'admin' && (
+        <Suspense fallback={overlayFallback}>
+          <Admin session={session} />
         </Suspense>
       )}
       {collection && (

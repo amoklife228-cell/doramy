@@ -7,6 +7,7 @@ import { fixLibraryTitles } from './lib/db';
 import { imageMode, installImageProbe, subscribeImageMode } from './lib/img';
 import { installEdgeSwipe } from './lib/edgeSwipe';
 import { installStripArrows } from './lib/stripArrows';
+import { installTracking } from './lib/track';
 import './styles.css';
 // Раскладка для компьютера: только внутри медиазапросов, телефонный вид не меняет.
 import './desktop.css';
@@ -38,6 +39,7 @@ setTimeout(() => {
 }, 2500);
 
 installImageProbe();
+installTracking();
 
 /**
  * Если сервер картинок TMDB оказался недоступен, адреса меняются на прокси (lib/img.ts).

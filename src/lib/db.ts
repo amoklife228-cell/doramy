@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { localizeTitles, needsRussianTitle } from './tmdb';
+import { noteAction } from './track';
 import {
   itemKey,
   minutesPerUnit,
@@ -127,6 +128,7 @@ export async function addToLibrary(drama: Drama, status: WatchStatus): Promise<v
   };
   await db.items.put(entry);
   onChange?.(entry.key, 'put');
+  noteAction();
   if (watched > 0) await logActivity(watched, watched * minutesPerUnit(drama));
 }
 
@@ -153,12 +155,14 @@ export async function updateEntry(key: string, patch: Partial<SavedDrama>): Prom
     updatedAt: Date.now(),
   });
   onChange?.(key, 'put');
+  noteAction();
   if (delta > 0) await logActivity(delta, delta * minutesPerUnit(before));
 }
 
 export async function removeEntry(key: string): Promise<void> {
   await db.items.delete(key);
   onChange?.(key, 'delete');
+  noteAction();
 }
 
 /** Обновить метаданные из свежего ответа TMDB, не трогая пользовательские поля и updatedAt. */

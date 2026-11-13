@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Session } from '@supabase/supabase-js';
 import { db, exportLibrary, importLibrary } from '../lib/db';
-import { goBack } from '../lib/router';
+import { goBack, navigate } from '../lib/router';
+import { checkAdmin } from '../lib/admin';
 import { currentIosGap } from '../lib/viewportFix';
 import {
   applyAppearance,
@@ -113,6 +114,19 @@ export function Settings({ session }: { session: Session | null | undefined }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const [message, setMessage] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!session) return setIsAdmin(false);
+    let alive = true;
+    checkAdmin().then(
+      (ok) => alive && setIsAdmin(ok === true),
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [session]);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -153,6 +167,19 @@ export function Settings({ session }: { session: Session | null | undefined }) {
         <h1 className="ios-large-title">Настройки</h1>
 
         <AccountSection session={session} />
+
+        {isAdmin && (
+          <IosSection>
+            <IosRow
+              icon={RowIcons.chart}
+              iconColor={IconColors.purple}
+              label="Админ-панель"
+              sub="Кто и как пользуется приложением"
+              chevron
+              onClick={() => navigate('/admin')}
+            />
+          </IosSection>
+        )}
 
         <AppearanceSection />
 
@@ -203,7 +230,8 @@ export function Settings({ session }: { session: Session | null | undefined }) {
           footer={
             <>
               Данные о сериалах и фильмах предоставлены TMDB. Этот продукт использует TMDB API, но не одобрен и не
-              сертифицирован TMDB.
+              сертифицирован TMDB. Приложение анонимно считает заходы (без имён и email), чтобы автор видел, сколько людей им
+              пользуется.
               <br />
               <span className="ios-diag">{diagnostics()}</span>
             </>
