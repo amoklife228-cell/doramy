@@ -1,0 +1,110 @@
+/* Дополнения к стилям, общим с админ-панелью (Admin.css). */
+
+.frn-username,
+.frn-msg {
+  line-height: 1.45;
+}
+.frn-username {
+  background: var(--bg-elev);
+  border-radius: 14px;
+  padding: 16px;
+}
+.frn-username p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+.frn-at {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev2);
+  border-radius: 10px;
+  padding: 0 12px;
+  margin-bottom: 12px;
+}
+.frn-at span {
+  font-size: 20px;
+  color: var(--muted);
+}
+.frn-at input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  padding: 12px 0;
+  outline: none;
+}
+.frn-msg {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 2px 10px;
+}
+
+.frn-friend-tap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.frn-add,
+.frn-accept {
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.frn-req-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.frn-decline,
+.frn-remove {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--bg-elev2);
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.frn-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.frn-share {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+.frn-share > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

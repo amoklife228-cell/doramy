@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DiscoverSort, LibraryKind, MediaType } from './types';
 
 export type Tab = 'catalog' | 'library' | 'feed' | 'profile';
-export type Overlay = 'settings' | 'notes' | 'history' | 'calendar' | 'wrapped' | 'admin';
+export type Overlay = 'settings' | 'notes' | 'history' | 'calendar' | 'wrapped' | 'admin' | 'friends';
 
 export interface Route {
   tab: Tab;
@@ -25,7 +25,7 @@ const SORT_IDS: DiscoverSort[] = ['popular', 'topRated', 'newest'];
 const TABS: Tab[] = ['catalog', 'library', 'feed', 'profile'];
 const KINDS: LibraryKind[] = ['dorama', 'series', 'movie'];
 // 'wrapped' — «Итоги года»; `#/wrapped/<год>` выбирает год (экран читает его из адреса сам).
-const OVERLAYS: Overlay[] = ['settings', 'notes', 'history', 'calendar', 'wrapped', 'admin'];
+const OVERLAYS: Overlay[] = ['settings', 'notes', 'history', 'calendar', 'wrapped', 'admin', 'friends'];
 
 let lastTab: Tab = 'catalog';
 

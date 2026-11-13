@@ -28,6 +28,7 @@ const Wrapped = lazy(() => import('./screens/Wrapped').then((m) => ({ default: m
 const Detail = lazy(() => import('./screens/Detail').then((m) => ({ default: m.Detail })));
 const Collection = lazy(() => import('./screens/Collection').then((m) => ({ default: m.Collection })));
 const Genre = lazy(() => import('./screens/Genre').then((m) => ({ default: m.Genre })));
+const Friends = lazy(() => import('./screens/Friends').then((m) => ({ default: m.Friends })));
 const Admin = lazy(() => import('./screens/Admin').then((m) => ({ default: m.Admin })));
 const Person = lazy(() => import('./screens/Person').then((m) => ({ default: m.Person })));
 
@@ -88,6 +89,11 @@ export default function App() {
       {route.overlay === 'wrapped' && (
         <Suspense fallback={overlayFallback}>
           <Wrapped />
+        </Suspense>
+      )}
+      {route.overlay === 'friends' && (
+        <Suspense fallback={overlayFallback}>
+          <Friends session={session} />
         </Suspense>
       )}
       {route.overlay === 'admin' && (

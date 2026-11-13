@@ -131,6 +131,14 @@ export function Profile({ session }: { session: Session | null | undefined }) {
               onClick={() => go('/history')}
             />
             <IosRow
+              icon={RowIcons.person}
+              iconColor={IconColors.teal}
+              label="Друзья"
+              sub="Смотрите, что смотрят друзья"
+              chevron
+              onClick={() => go('/friends')}
+            />
+            <IosRow
               icon={RowIcons.sparkles}
               iconColor={IconColors.purple}
               label="Итоги года"
