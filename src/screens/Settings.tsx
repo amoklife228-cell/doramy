@@ -15,7 +15,16 @@ import {
   TABBAR_GAP_RANGE,
   type Appearance,
 } from '../lib/appearance';
-import { IconColors, IosRow, IosSection, RowIcons } from '../components/IosList';
+import {
+  DEFAULT_PREFS,
+  disablePush,
+  enablePush,
+  pushSupported,
+  updatePrefs,
+  useNotifyState,
+  type PushPrefs,
+} from '../lib/push';
+import { IconColors, IosRow, IosSection, IosSwitch, RowIcons } from '../components/IosList';
 import { NavBar } from '../components/NavBar';
 import { plural } from './Profile';
 import { AccountSection } from './Account';
@@ -105,6 +114,73 @@ function AppearanceSection() {
   );
 }
 
+/** Раздел «Уведомления»: включение push и выбор, о чём присылать. */
+function NotificationsSection({ session }: { session: Session | null | undefined }) {
+  const loggedIn = !!session;
+  const { state, run } = useNotifyState(loggedIn);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!pushSupported()) return null;
+
+  const toggle = (on: boolean) =>
+    run(async () => {
+      setError(null);
+      try {
+        if (on) await enablePush(state.prefs ?? DEFAULT_PREFS);
+        else await disablePush();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+
+  const setPref = (patch: Partial<PushPrefs>) =>
+    run(async () => {
+      setError(null);
+      try {
+        await updatePrefs({ ...state.prefs, ...patch });
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+
+  const footer = !loggedIn
+    ? 'Войдите в аккаунт, чтобы получать уведомления: без него сервер не знает, что вы смотрите.'
+    : state.needsInstall
+      ? 'На iPhone уведомления приходят, только если приложение добавлено на экран «Домой». Из вкладки Safari — нет.'
+      : state.permission === 'denied'
+        ? 'Уведомления запрещены в настройках браузера для этого сайта. Разрешите их там и вернитесь.'
+        : 'Приходят, даже когда приложение закрыто. Проверяются раз в час.';
+
+  const canEnable = loggedIn && !state.needsInstall && state.permission !== 'denied';
+
+  return (
+    <IosSection title="Уведомления" footer={error ?? footer}>
+      <IosRow icon={RowIcons.bell} iconColor={IconColors.red} label="Уведомления">
+        <IosSwitch
+          label="Уведомления"
+          checked={state.subscribed}
+          disabled={state.busy || (!state.subscribed && !canEnable)}
+          onChange={(v) => void toggle(v)}
+        />
+      </IosRow>
+      {state.subscribed && (
+        <>
+          <IosRow label="О новых сериях" sub="Когда выходит серия того, что вы смотрите">
+            <IosSwitch label="О новых сериях" checked={state.prefs.episodes} onChange={(v) => void setPref({ episodes: v })} />
+          </IosRow>
+          <IosRow label="Напоминать вернуться" sub="Если давно не заходили и есть недосмотренное">
+            <IosSwitch
+              label="Напоминать вернуться"
+              checked={state.prefs.reminders}
+              onChange={(v) => void setPref({ reminders: v })}
+            />
+          </IosRow>
+        </>
+      )}
+    </IosSection>
+  );
+}
+
 export function Settings({ session }: { session: Session | null | undefined }) {
   const count = useLiveQuery(() => db.items.count(), []) ?? 0;
 
@@ -167,6 +243,8 @@ export function Settings({ session }: { session: Session | null | undefined }) {
         <h1 className="ios-large-title">Настройки</h1>
 
         <AccountSection session={session} />
+
+        <NotificationsSection session={session} />
 
         {isAdmin && (
           <IosSection>

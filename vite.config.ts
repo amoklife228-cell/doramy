@@ -27,6 +27,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Свой service worker (src/sw.ts): нужен обработчик push-уведомлений, которого нет в generateSW.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+      },
       includeAssets: ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Дорамы',
@@ -43,51 +50,6 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           // Сердце занимает центр, фон на весь квадрат: безопасная зона маски соблюдена.
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
-      workbox: {
-        navigateFallback: '/doramy/index.html',
-        runtimeCaching: [
-          {
-            // Адрес приходит с ?t=..., поэтому без якоря $ и с ignoreSearch: одна запись, свежая при сети.
-            urlPattern: /\/doramy\/news\.json(\?.*)?$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'news',
-              networkTimeoutSeconds: 6,
-              matchOptions: { ignoreSearch: true },
-              expiration: { maxEntries: 1 },
-            },
-          },
-          {
-            // Проверка доступности (?probe=…, lib/img.ts) идёт мимо кэша, иначе он ответил бы за сеть.
-            urlPattern: ({ url }) => url.hostname === 'image.tmdb.org' && !url.searchParams.has('probe'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'tmdb-images',
-              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // Те же картинки через прокси, когда image.tmdb.org недоступен.
-            urlPattern: /^https:\/\/wsrv\.nl\/\?url=image\.tmdb\.org\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'tmdb-images-proxy',
-              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/api\.themoviedb\.org\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'tmdb-api',
-              networkTimeoutSeconds: 4,
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-            },
-          },
         ],
       },
     }),

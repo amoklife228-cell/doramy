@@ -14,5 +14,7 @@
     "skipLibCheck": true,
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "comment-sw": "src/sw.ts собирается отдельно (vite-plugin-pwa) с типами web worker; в общей проверке с типами DOM он бы не прошёл.",
+  "exclude": ["src/sw.ts"]
 }

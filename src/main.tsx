@@ -41,6 +41,12 @@ setTimeout(() => {
 installImageProbe();
 installTracking();
 
+// Переход по нажатию на уведомление, когда окно уже открыто (service worker просит сменить адрес).
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  const data = e.data as { type?: string; hash?: string } | undefined;
+  if (data?.type === 'navigate' && data.hash) location.hash = data.hash.replace(/^#/, '');
+});
+
 /**
  * Если сервер картинок TMDB оказался недоступен, адреса меняются на прокси (lib/img.ts).
  * Адреса считаются при отрисовке, поэтому перемонтируем приложение: маршрут в адресе, он сохранится.

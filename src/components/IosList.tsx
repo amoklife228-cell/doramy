@@ -99,10 +99,12 @@ export function IosSwitch({
   checked,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -112,6 +114,7 @@ export function IosSwitch({
       aria-label={label}
       aria-checked={checked}
       checked={checked}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
     />
   );
@@ -194,6 +197,12 @@ export const RowIcons = {
   chart: (
     <svg viewBox="0 0 24 24" {...s}>
       <path d="M5 20V11M12 20V5M19 20v-6" strokeWidth={2.4} />
+    </svg>
+  ),
+  bell: (
+    <svg viewBox="0 0 24 24" {...s}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
     </svg>
   ),
   /** «Итоги года»: вспышка с искрой. */

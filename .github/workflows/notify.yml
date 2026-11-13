@@ -1,0 +1,29 @@
+name: Push notifications
+
+on:
+  schedule:
+    # Раз в час: проверить новые серии и разослать уведомления.
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+# Не мешаем деплою и не запускаем две рассылки разом.
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Send push
+        run: npm run push
+        env:
+          PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
