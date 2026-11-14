@@ -13,6 +13,20 @@ create table if not exists public.profiles (
 create unique index if not exists profiles_username_key on public.profiles (lower(username));
 alter table public.profiles enable row level security;
 
+-- Заявки и дружба. Одна строка = одно направление заявки; accepted = дружат.
+-- Создаётся до политики profiles ниже, которая на неё ссылается.
+create table if not exists public.friendships (
+  from_user  uuid        not null references auth.users (id) on delete cascade,
+  to_user    uuid        not null references auth.users (id) on delete cascade,
+  status     text        not null default 'pending' check (status in ('pending', 'accepted')),
+  created_at timestamptz not null default now(),
+  primary key (from_user, to_user),
+  check (from_user <> to_user)
+);
+create index if not exists friendships_to on public.friendships (to_user, status);
+alter table public.friendships enable row level security;
+revoke all on public.friendships from anon, authenticated;  -- только через функции ниже
+
 -- Видно свой профиль и профили принятых друзей (поиск чужих — через функцию ниже).
 drop policy if exists "profiles read" on public.profiles;
 create policy "profiles read" on public.profiles for select using (
@@ -25,19 +39,6 @@ create policy "profiles read" on public.profiles for select using (
   )
 );
 grant select on public.profiles to authenticated;
-
--- Заявки и дружба. Одна строка = одно направление заявки; accepted = дружат.
-create table if not exists public.friendships (
-  from_user  uuid        not null references auth.users (id) on delete cascade,
-  to_user    uuid        not null references auth.users (id) on delete cascade,
-  status     text        not null default 'pending' check (status in ('pending', 'accepted')),
-  created_at timestamptz not null default now(),
-  primary key (from_user, to_user),
-  check (from_user <> to_user)
-);
-create index if not exists friendships_to on public.friendships (to_user, status);
-alter table public.friendships enable row level security;
-revoke all on public.friendships from anon, authenticated;  -- только через функции ниже
 
 -- Дружат ли двое (в любом направлении).
 create or replace function public.are_friends(a uuid, b uuid) returns boolean
